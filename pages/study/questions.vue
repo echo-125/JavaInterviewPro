@@ -66,8 +66,9 @@
 		onUnmounted
 	} from 'vue'
 	import db from '@/common/database'
-	import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData, importInitialProgressData, importInitialFavoriteData } from '@/utils/dbInit'
+	import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData } from '@/utils/dbInit'
 	import { onBackPress } from '@dcloudio/uni-app'
+	import { getQuestionsWithStatus, getCategoryProgress } from '@/api/api'
 
 	// 页面配置
 	defineOptions({
@@ -195,32 +196,13 @@
 				await initTables()
 				await importCategoryData()
 				await importQuestionMapData()
-				await importInitialProgressData()
-				await importInitialFavoriteData()
 			}
 			
 			// 获取题目列表
-			const sql = `
-				SELECT q.id, q.title, q.sort_order,
-					CASE WHEN f.question_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite,
-					p.last_visit_time
-				FROM question_map q
-				LEFT JOIN favorites f ON q.id = f.question_id
-				LEFT JOIN user_progress p ON q.id = p.question_id
-				WHERE q.category_id = ${categoryId.value}
-				ORDER BY q.sort_order ASC
-			`
-			
-			const result = await db.selectTableDataBySql(sql)
+			const result = await getQuestionsWithStatus(categoryId.value)
 			
 			if (result && result.length > 0) {
-				questions.value = result.map(item => ({
-					id: item.id,
-					title: item.title,
-					sort_order: item.sort_order,
-					is_favorite: item.is_favorite === 1,
-					last_visit_time: item.last_visit_time
-				}))
+				questions.value = result
 				// 计算已完成的题目数量
 				completedCount.value = questions.value.filter(q => q.last_visit_time).length
 			} else {

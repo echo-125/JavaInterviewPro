@@ -73,9 +73,17 @@ import { ref, computed, onMounted } from 'vue'
 import db from '@/common/database'
 import { checkAndInitDB } from '@/utils/dbInit'
 import { formatDateTime } from '@/utils/dateUtil'
+import { 
+    getQuestionById, 
+    updateLearnStatus, 
+    cancelLearnStatus, 
+    toggleFavorite,
+    getQuestionsWithStatus
+} from '@/api/api'
 
 const categoryId = ref('')
 const categoryName = ref('')
+const questionId = ref('')
 const questions = ref([])
 const currentIndex = ref(0)
 const isLoading = ref(false)
@@ -125,42 +133,12 @@ const loadQuestions = async () => {
       }
     }
     
-    // 确保 categoryId 是数字类型
-    const numericCategoryId = parseInt(categoryId.value)
-    console.log('查询使用的 categoryId:', numericCategoryId)
-    
-    // 获取题目列表
-    const sql = `
-      SELECT 
-        q.id,
-        q.category_id,
-        q.uri,
-        q.title,
-        q.content,
-        q.answer,
-        q.sort_order,
-        q.create_time,
-        CASE WHEN f.id IS NOT NULL THEN 1 ELSE 0 END as is_favorite,
-        up.last_visit_time as last_study_time,
-        up.create_time as first_study_time
-      FROM question_map q
-      LEFT JOIN favorites f ON q.id = f.question_id
-      LEFT JOIN user_progress up ON q.id = up.question_id
-      WHERE q.category_id = ${numericCategoryId}
-      ORDER BY q.sort_order ASC
-    `
-    
-    console.log('执行的 SQL:', sql)
-    const result = await db.selectTableDataBySql(sql)
-    console.log('SQL 查询结果:', result)
+    // 获取该分类下的所有题目
+    const result = await getQuestionsWithStatus(categoryId.value)
+    console.log('获取到的题目列表:', result)
     
     if (result && result.length > 0) {
-      questions.value = result.map(item => ({
-        ...item,
-        is_favorite: item.is_favorite === 1,
-        last_study_time: item.last_study_time || null,
-        first_study_time: item.first_study_time || null
-      }))
+      questions.value = result
       console.log('处理后的题目列表:', questions.value)
       console.log('当前题目:', questions.value[currentIndex.value])
     } else {
@@ -174,7 +152,7 @@ const loadQuestions = async () => {
   }
 }
 
-// 更新学习时间
+// 更新学习状态
 const updateStudyTime = async (questionId) => {
   try {
     // 确保 questionId 是有效的数字
@@ -186,22 +164,15 @@ const updateStudyTime = async (questionId) => {
     
     console.log('更新学习时间，questionId:', numericQuestionId)
     
-    // 使用 INSERT OR REPLACE 语句
-    const sql = `
-      INSERT OR REPLACE INTO user_progress (question_id, last_visit_time, create_time)
-      VALUES (${numericQuestionId}, datetime('now', 'localtime'), 
-        COALESCE((SELECT create_time FROM user_progress WHERE question_id = ${numericQuestionId}), 
-        datetime('now', 'localtime')))
-    `
+    // 更新学习状态
+    const success = await updateLearnStatus(numericQuestionId)
+    if (!success) {
+      return null
+    }
     
-    console.log('执行SQL:', sql)
-    await db.executeSql(sql)
-    console.log('学习时间更新成功')
-    
-    // 查询更新后的时间
-    const selectSql = 'SELECT last_visit_time, create_time FROM user_progress WHERE question_id = ?'
-    const result = await db.selectTableDataBySql(selectSql, [numericQuestionId])
-    return result[0] || null
+    // 获取更新后的题目信息
+    const result = await getQuestionById(numericQuestionId)
+    return result ? { learn_time: result.last_study_time } : null
   } catch (error) {
     console.error('更新学习时间失败:', JSON.stringify(error))
     return null
@@ -209,7 +180,7 @@ const updateStudyTime = async (questionId) => {
 }
 
 // 切换收藏状态
-const toggleFavorite = async () => {
+const toggleFavoriteStatus = async () => {
   try {
     const questionId = currentQuestion.value.id
     if (!questionId) {
@@ -219,16 +190,9 @@ const toggleFavorite = async () => {
     
     console.log('切换收藏状态，当前收藏状态:', isFavorite.value)
     
-    if (isFavorite.value) {
-      // 取消收藏
-      const sql = 'DELETE FROM favorites WHERE question_id = ?'
-      await db.executeSql(sql, [questionId])
-      console.log('取消收藏成功')
-    } else {
-      // 添加收藏
-      const sql = 'INSERT INTO favorites (question_id, create_time) VALUES (?, datetime("now", "localtime"))'
-      await db.executeSql(sql, [questionId])
-      console.log('添加收藏成功')
+    const success = await toggleFavorite(questionId)
+    if (!success) {
+      throw new Error('切换收藏状态失败')
     }
     
     // 重新加载题目列表以更新收藏状态
@@ -266,19 +230,19 @@ const toggleStudyStatus = async () => {
     
     if (isMarking.value) {
       // 标记为已学习
-      const times = await updateStudyTime(questionId)
-      if (times) {
-        questions.value[currentIndex.value].last_study_time = times.last_visit_time
-        questions.value[currentIndex.value].first_study_time = times.create_time
+      const result = await updateStudyTime(questionId)
+      if (result) {
+        questions.value[currentIndex.value].last_study_time = result.learn_time
       }
     } else {
       // 取消已学习状态
-      const sql = 'DELETE FROM user_progress WHERE question_id = ?'
-      await db.executeSql(sql, [questionId])
+      const success = await cancelLearnStatus(questionId)
+      if (!success) {
+        throw new Error('取消学习状态失败')
+      }
       
       // 更新本地数据
       questions.value[currentIndex.value].last_study_time = null
-      questions.value[currentIndex.value].first_study_time = null
     }
   } catch (error) {
     console.error('切换学习状态失败:', error)
@@ -294,6 +258,8 @@ const toggleStudyStatus = async () => {
 const prevQuestion = async () => {
   if (currentIndex.value > 0) {
     currentIndex.value--
+    // 更新学习状态标记
+    isMarking.value = !!questions.value[currentIndex.value].last_study_time
   }
 }
 
@@ -301,6 +267,8 @@ const prevQuestion = async () => {
 const nextQuestion = async () => {
   if (currentIndex.value < totalQuestions.value - 1) {
     currentIndex.value++
+    // 更新学习状态标记
+    isMarking.value = !!questions.value[currentIndex.value].last_study_time
   }
 }
 
@@ -336,7 +304,8 @@ onMounted(async () => {
       return
     }
     
-    // 使用传入的 categoryId，如果没有则使用 id
+    // 设置参数
+    questionId.value = id
     categoryId.value = categoryIdParam || id
     categoryName.value = decodeURIComponent(name)
     // 设置当前题目索引

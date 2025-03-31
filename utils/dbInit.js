@@ -24,8 +24,6 @@ async function initTables() {
         console.log('开始创建表...')
         
         // 删除已存在的表（如果存在）
-        await db.executeSql('DROP TABLE IF EXISTS favorites')
-        await db.executeSql('DROP TABLE IF EXISTS user_progress')
         await db.executeSql('DROP TABLE IF EXISTS question_map')
         await db.executeSql('DROP TABLE IF EXISTS category')
         console.log('清理旧表成功')
@@ -33,45 +31,27 @@ async function initTables() {
         // 创建分类表
         await db.executeSql(`
             CREATE TABLE category (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                create_time TEXT NOT NULL
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(50) NOT NULL,
+                create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `)
 
         // 创建题目表
         await db.executeSql(`
             CREATE TABLE question_map (
-                id INTEGER PRIMARY KEY,
-                category_id INTEGER NOT NULL,
-                uri TEXT NOT NULL,
-                title TEXT NOT NULL,
-                content TEXT,
-                answer TEXT,
-                sort_order INTEGER NOT NULL,
-                create_time TEXT NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uri VARCHAR(255) NOT NULL,
+                title VARCHAR(255),
+                category_id INTEGER,
+                sort_order INTEGER,    -- 排序字段
+                answer TEXT,           -- 题目答案
+                is_favorite BOOLEAN DEFAULT 0,  -- 是否收藏
+                favorite_time TIMESTAMP,        -- 收藏时间
+                is_learned BOOLEAN DEFAULT 0,   -- 是否学习
+                learn_time TIMESTAMP,           -- 学习时间
+                create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (category_id) REFERENCES category(id)
-            )
-        `)
-
-        // 创建用户进度表
-        await db.executeSql(`
-            CREATE TABLE user_progress (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                question_id INTEGER NOT NULL,
-                last_visit_time TEXT NOT NULL,
-                create_time TEXT NOT NULL,
-                FOREIGN KEY (question_id) REFERENCES question_map(id)
-            )
-        `)
-
-        // 创建收藏表
-        await db.executeSql(`
-            CREATE TABLE favorites (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                question_id INTEGER NOT NULL,
-                create_time TEXT NOT NULL,
-                FOREIGN KEY (question_id) REFERENCES question_map(id)
             )
         `)
 
@@ -79,8 +59,6 @@ async function initTables() {
         await db.executeSql('CREATE INDEX idx_question_category ON question_map(category_id)')
         await db.executeSql('CREATE INDEX idx_question_uri ON question_map(uri)')
         await db.executeSql('CREATE INDEX idx_question_sort ON question_map(category_id, sort_order)')
-        await db.executeSql('CREATE INDEX idx_user_progress_question ON user_progress(question_id)')
-        await db.executeSql('CREATE INDEX idx_favorites_question ON favorites(question_id)')
 
         console.log('数据库表创建成功')
     } catch (error) {
@@ -121,8 +99,23 @@ async function importQuestionMapData() {
         // 导入新数据
         for (const question of questionMapData) {
             const sql = `
-                INSERT INTO question_map (id, category_id, uri, title, content, answer, sort_order, create_time)         
-                VALUES (${question.id}, ${question.categoryId}, '${question.uri}', '${question.title}', '${question.content}', '${question.answer}', ${question.sortOrder}, '${question.createTime}')
+                INSERT INTO question_map (
+                    id, category_id, uri, title, answer, sort_order, create_time,
+                    is_favorite, favorite_time, is_learned, learn_time
+                )         
+                VALUES (
+                    ${question.id}, 
+                    ${question.categoryId}, 
+                    '${question.uri}', 
+                    '${question.title}', 
+                    '${question.answer}', 
+                    ${question.sortOrder}, 
+                    '${question.createTime}',
+                    0,
+                    NULL,
+                    0,
+                    NULL
+                )
             `
             await db.executeSql(sql)
         }
@@ -130,52 +123,6 @@ async function importQuestionMapData() {
         console.log('题目数据导入成功')
     } catch (error) {
         console.error('导入题目数据失败:', error)
-        throw error
-    }
-}
-
-/**
- * 导入初始用户进度数据
- */
-async function importInitialProgressData() {
-    try {
-        // 清空现有数据
-        await db.executeSql('DELETE FROM user_progress')
-        
-        // 导入初始数据
-        const currentTime = new Date().toISOString()
-        const sql = `
-            INSERT INTO user_progress (question_id, last_visit_time, create_time)
-            VALUES (1, '${currentTime}', '${currentTime}')
-        `
-        await db.executeSql(sql)
-        
-        console.log('初始用户进度数据导入成功')
-    } catch (error) {
-        console.error('导入初始用户进度数据失败:', error)
-        throw error
-    }
-}
-
-/**
- * 导入初始收藏数据
- */
-async function importInitialFavoriteData() {
-    try {
-        // 清空现有数据
-        await db.executeSql('DELETE FROM favorites')
-        
-        // 导入初始数据
-        const currentTime = new Date().toISOString()
-        const sql = `
-            INSERT INTO favorites (question_id, create_time)
-            VALUES (1, '${currentTime}')
-        `
-        await db.executeSql(sql)
-        
-        console.log('初始收藏数据导入成功')
-    } catch (error) {
-        console.error('导入初始收藏数据失败:', error)
         throw error
     }
 }
@@ -198,18 +145,14 @@ async function checkAndInitDB() {
         console.log('检查表是否存在...')
         const categoryExists = await checkTableExists('category')
         const questionMapExists = await checkTableExists('question_map')
-        const userProgressExists = await checkTableExists('user_progress')
-        const favoritesExists = await checkTableExists('favorites')
         
         console.log('表检查结果:', {
             category: categoryExists,
-            questionMap: questionMapExists,
-            userProgress: userProgressExists,
-            favorites: favoritesExists
+            questionMap: questionMapExists
         })
 
         // 如果任何表不存在，重新初始化
-        if (!categoryExists || !questionMapExists || !userProgressExists || !favoritesExists) {
+        if (!categoryExists || !questionMapExists) {
             console.log('检测到表不存在，开始初始化...')
             await initTables()
             console.log('表初始化完成')
@@ -221,12 +164,6 @@ async function checkAndInitDB() {
             
             await importQuestionMapData()
             console.log('题目数据导入完成')
-            
-            await importInitialProgressData()
-            console.log('用户进度数据导入完成')
-            
-            await importInitialFavoriteData()
-            console.log('收藏数据导入完成')
             
             console.log('所有数据导入完成')
         } else {
@@ -246,8 +183,6 @@ async function checkAndInitDB() {
                 console.log('检测到数据为空，开始导入数据...')
                 await importCategoryData()
                 await importQuestionMapData()
-                await importInitialProgressData()
-                await importInitialFavoriteData()
                 console.log('数据导入完成')
             }
         }
@@ -263,7 +198,5 @@ export {
     checkAndInitDB,
     initTables,
     importCategoryData,
-    importQuestionMapData,
-    importInitialProgressData,
-    importInitialFavoriteData
+    importQuestionMapData
 }

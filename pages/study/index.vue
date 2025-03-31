@@ -55,8 +55,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import db from '@/common/database'
-import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData, importInitialProgressData, importInitialFavoriteData } from '@/utils/dbInit'
+import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData } from '@/utils/dbInit'
+import { getCategories } from '@/api/api'
 
 // 页面配置
 defineOptions({
@@ -88,36 +88,16 @@ const loadCategories = async () => {
     // 获取所有分类
     let result = []
     try {
-      result = await db.selectTableDataBySql(`
-        SELECT c.*, 
-          COUNT(q.id) as questionCount,
-          COUNT(CASE WHEN up.last_visit_time IS NOT NULL THEN 1 END) as completedCount
-        FROM category c
-        LEFT JOIN question_map q ON c.id = q.category_id
-        LEFT JOIN user_progress up ON q.id = up.question_id
-        GROUP BY c.id
-        ORDER BY c.create_time ASC
-      `)
+      result = await getCategories()
       
       // 检查是否有数据
       if (result.length === 0) {
         await initTables()
         await importCategoryData()
         await importQuestionMapData()
-        await importInitialProgressData()
-        await importInitialFavoriteData()
         
         // 重新查询数据
-        result = await db.selectTableDataBySql(`
-          SELECT c.*, 
-            COUNT(q.id) as questionCount,
-            COUNT(CASE WHEN up.last_visit_time IS NOT NULL THEN 1 END) as completedCount
-          FROM category c
-          LEFT JOIN question_map q ON c.id = q.category_id
-          LEFT JOIN user_progress up ON q.id = up.question_id
-          GROUP BY c.id
-          ORDER BY c.create_time ASC
-        `)
+        result = await getCategories()
       }
     } catch (error) {
       console.error('查询分类数据失败:', JSON.stringify(error))
