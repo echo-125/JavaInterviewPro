@@ -1,7 +1,28 @@
 <script>
+import { checkAndInitDB } from '@/utils/dbInit.js'
+
 export default {
-	onLaunch: function() {
+	onLaunch: async function() {
 		console.log('App Launch')
+		try {
+			// 显示loading提示
+			uni.showLoading({
+				title: '正在初始化数据库...',
+				mask: true
+			})
+			
+			await checkAndInitDB()
+			
+			// 隐藏loading提示
+			uni.hideLoading()
+		} catch (error) {
+			console.error('数据库初始化失败:', error)
+			uni.hideLoading()
+			uni.showToast({
+				title: '数据库初始化失败',
+				icon: 'none'
+			})
+		}
 	},
 	onShow: function() {
 		console.log('App Show')

@@ -11,7 +11,13 @@
     </view>
 
     <!-- 分类列表 -->
-    <scroll-view scroll-y class="category-list">
+    <scroll-view 
+      scroll-y 
+      class="category-list"
+      refresher-enabled
+      :refresher-triggered="isRefreshing"
+      @refresherrefresh="onRefresh"
+    >
       <view 
         v-for="category in filteredCategories" 
         :key="category.id" 
@@ -33,17 +39,17 @@
           <text class="progress-text">{{ category.progress }}%</text>
         </view>
       </view>
+
+      <!-- 加载状态 -->
+      <view v-if="isLoading" class="loading">
+        <text>加载中...</text>
+      </view>
+
+      <!-- 空状态 -->
+      <view v-if="!isLoading && categories.length === 0" class="empty">
+        <text>暂无分类数据</text>
+      </view>
     </scroll-view>
-
-    <!-- 加载状态 -->
-    <view v-if="isLoading" class="loading">
-      <text>加载中...</text>
-    </view>
-
-    <!-- 空状态 -->
-    <view v-if="!isLoading && categories.length === 0" class="empty">
-      <text>暂无分类数据</text>
-    </view>
   </view>
 </template>
 
@@ -54,6 +60,7 @@ import db from '@/common/database'
 const categories = ref([])
 const searchText = ref('')
 const isLoading = ref(false)
+const isRefreshing = ref(false)
 
 // 过滤后的分类列表
 const filteredCategories = computed(() => {
@@ -62,23 +69,6 @@ const filteredCategories = computed(() => {
     category.name.toLowerCase().includes(searchText.value.toLowerCase())
   )
 })
-
-// 初始化数据库
-const initDatabase = async () => {
-  try {
-    console.log('开始初始化数据库...')
-    const success = await db.initDatabase()
-    if (!success) {
-      console.error('数据库初始化失败')
-      return false
-    }
-    console.log('数据库初始化成功')
-    return true
-  } catch (error) {
-    console.error('数据库初始化失败:', error)
-    return false
-  }
-}
 
 // 加载分类列表
 const loadCategories = async () => {
@@ -100,7 +90,7 @@ const loadCategories = async () => {
         GROUP BY c.id
         ORDER BY c.create_time ASC
       `)
-      console.log('原始查询结果:', JSON.stringify(result))
+      //console.log('原始查询结果:', JSON.stringify(result))
     } catch (error) {
       console.error('查询分类数据失败:', error)
       return
@@ -115,11 +105,16 @@ const loadCategories = async () => {
       progress: item.questionCount ? Math.round((item.completedCount / item.questionCount) * 100) : 0
     }))
     
-    console.log('处理后的分类列表:', JSON.stringify(categories.value))
+    //console.log('处理后的分类列表:', JSON.stringify(categories.value))
   } catch (error) {
     console.error('加载分类失败:', error)
+    uni.showToast({
+      title: '加载分类失败',
+      icon: 'none'
+    })
   } finally {
     isLoading.value = false
+    isRefreshing.value = false
   }
 }
 
@@ -135,20 +130,16 @@ const navigateToQuestions = (category) => {
   })
 }
 
+// 下拉刷新处理
+const onRefresh = async () => {
+  console.log('触发下拉刷新')
+  isRefreshing.value = true
+  await loadCategories()
+}
+
 onMounted(async () => {
   console.log('页面加载完成，开始加载数据...')
-  try {
-    // 初始化数据库
-    const initSuccess = await initDatabase()
-    if (!initSuccess) {
-      console.error('数据库初始化失败，无法加载分类')
-      return
-    }
-    // 加载分类列表
-    await loadCategories()
-  } catch (error) {
-    console.error('页面初始化失败:', error)
-  }
+  await loadCategories()
 })
 </script>
 

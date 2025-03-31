@@ -11,3 +11,10 @@
 /public/robots.txt
 
 package-lock.json
+
+
+相关文件/
+
+unpackage/
+unpackage/dist/dev/
+
