@@ -3,7 +3,7 @@
     <view class="header">
       <view class="avatar-section">
         <image class="avatar" src="/static/images/avatar.png" mode="aspectFill"></image>
-        <text class="nickname">Java学习者</text>
+        <text class="nickname">iKun</text>
       </view>
       <view class="stats-section">
         <view class="stat-item">

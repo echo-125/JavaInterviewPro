@@ -8,6 +8,13 @@
 			}
 		},
 		{
+			"path": "pages/study/questions",
+			"style": {
+				"navigationBarTitleText": "题目列表",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
 			"path": "pages/favorite/index",
 			"style": {
 				"navigationBarTitleText": "收藏",

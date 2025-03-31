@@ -1,20 +1,9 @@
-.idea/JavaInterviewPro.iml
-.idea/modules.xml
-.idea/vcs.xml
-.idea/.gitignore
-.idea/misc.xml
-/node_modules
-/dist
-/build
-/public/static
-/public/favicon.ico
-/public/robots.txt
-
+.idea/
+.hbuilderx/
+_docs/
+node_modules/
 package-lock.json
-
-
 相关文件/
-
 unpackage/
-unpackage/dist/dev/
+
 

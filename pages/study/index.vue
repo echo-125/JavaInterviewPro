@@ -90,7 +90,7 @@ const loadCategories = async () => {
         GROUP BY c.id
         ORDER BY c.create_time ASC
       `)
-      //console.log('原始查询结果:', JSON.stringify(result))
+      console.log('原始查询结果:', JSON.stringify(result))
     } catch (error) {
       console.error('查询分类数据失败:', error)
       return

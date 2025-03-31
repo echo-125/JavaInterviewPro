@@ -188,44 +188,76 @@ async function importInitialFavoriteData() {
  */
 async function checkAndInitDB() {
     try {
+        console.log('开始检查数据库初始化...')
+        
         // 确保数据库已打开
         if (!db.isOpen()) {
+            console.log('数据库未打开，正在打开...')
             await db.open()
+            console.log('数据库打开成功')
         }
 
         // 检查表是否存在
+        console.log('检查表是否存在...')
         const categoryExists = await checkTableExists('category')
         const questionMapExists = await checkTableExists('question_map')
         const userProgressExists = await checkTableExists('user_progress')
         const favoritesExists = await checkTableExists('favorites')
+        
+        console.log('表检查结果:', {
+            category: categoryExists,
+            questionMap: questionMapExists,
+            userProgress: userProgressExists,
+            favorites: favoritesExists
+        })
 
-        // 如果任何表不存在，都需要初始化
+        // 如果任何表不存在，重新初始化
         if (!categoryExists || !questionMapExists || !userProgressExists || !favoritesExists) {
-            console.log('数据库需要初始化')
+            console.log('检测到表不存在，开始初始化...')
             await initTables()
+            console.log('表初始化完成')
+            
+            // 导入数据
+            console.log('开始导入数据...')
             await importCategoryData()
+            console.log('分类数据导入完成')
+            
             await importQuestionMapData()
+            console.log('题目数据导入完成')
+            
             await importInitialProgressData()
+            console.log('用户进度数据导入完成')
+            
             await importInitialFavoriteData()
-            console.log('数据库初始化完成')
+            console.log('收藏数据导入完成')
+            
+            console.log('所有数据导入完成')
         } else {
+            console.log('所有表已存在，无需初始化')
+            
             // 检查是否有数据
-            const result = await db.selectTableDataBySql('SELECT COUNT(*) as count FROM category')
-            const count = result[0].count
-
-            if (count === 0) {
-                console.log('数据库表已存在但无数据，开始导入数据')
+            const categoryCount = await db.selectTableDataBySql('SELECT COUNT(*) as count FROM category')
+            const questionCount = await db.selectTableDataBySql('SELECT COUNT(*) as count FROM question_map')
+            
+            console.log('数据检查结果:', {
+                categoryCount: categoryCount[0].count,
+                questionCount: questionCount[0].count
+            })
+            
+            // 如果没有数据，重新导入
+            if (categoryCount[0].count === 0 || questionCount[0].count === 0) {
+                console.log('检测到数据为空，开始导入数据...')
                 await importCategoryData()
                 await importQuestionMapData()
                 await importInitialProgressData()
                 await importInitialFavoriteData()
                 console.log('数据导入完成')
-            } else {
-                console.log('数据库已经初始化，跳过初始化步骤')
             }
         }
+        
+        console.log('数据库初始化检查完成')
     } catch (error) {
-        console.error('检查数据库状态失败:', error)
+        console.error('数据库初始化失败:', error)
         throw error
     }
 }
@@ -237,4 +269,4 @@ export {
     importQuestionMapData,
     importInitialProgressData,
     importInitialFavoriteData
-} 
+}
