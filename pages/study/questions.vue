@@ -30,9 +30,9 @@
 								<text class="icon">☆</text>
 								<text>未收藏</text>
 							</view>
-							<view v-if="question.last_visit_time" class="tag completed">
+							<view v-if="question.is_learned" class="tag completed">
 								<text class="icon">✓</text>
-								<text>已完成</text>
+								<text>已学习</text>
 							</view>
 							<view v-else class="tag uncompleted">
 								<text class="icon">○</text>
@@ -72,7 +72,11 @@
 
 	// 页面配置
 	defineOptions({
-		navigationStyle: 'custom'
+		navigationStyle: 'custom',
+		navigationBarTitleText: '',
+		navigationBar: {
+			titleText: ''
+		}
 	})
 
 	const categoryId = ref('')
@@ -89,6 +93,12 @@
 
 	// 返回上一页
 	const goBack = () => {
+		// 发送刷新通知
+		uni.$emit('categoryProgressChanged', {
+			categoryId: categoryId.value
+		})
+		console.log('发送分类进度变更通知，categoryId:', categoryId.value)
+		
 		uni.switchTab({
 			url: '/pages/study/index'
 		})
@@ -113,8 +123,8 @@
 		uni.$store.scrollPositions[route] = scrollTop.value
 	}
 
-	// 页面显示时恢复滚动位置
-	const onShow = () => {
+	// 页面显示时恢复滚动位置并刷新数据
+	const onShow = async () => {
 		const route = '/pages/study/index'
 		const saved = uni.$store?.scrollPositions?.[route]
 		if (saved !== undefined) {
@@ -123,6 +133,8 @@
 				duration: 0
 			})
 		}
+		// 刷新题目列表
+		await loadQuestions()
 	}
 
 	onMounted(() => {
@@ -140,11 +152,17 @@
 		
 		// 加载题目列表
 		loadQuestions()
+		
+		// 监听题目状态变更事件
+		uni.$on('questionStatusChanged', handleQuestionStatusChanged)
+		console.log('已添加题目状态变更事件监听')
 	})
 
-	// 移除页面滚动监听
+	// 移除页面滚动监听和事件监听
 	onUnmounted(() => {
-		// 不需要移除监听，因为onPageScroll是生命周期函数
+		// 移除题目状态变更事件监听
+		uni.$off('questionStatusChanged', handleQuestionStatusChanged)
+		console.log('已移除题目状态变更事件监听')
 	})
 
 	// 处理触摸开始
@@ -179,35 +197,69 @@
 	// 在 script setup 部分添加计算属性
 	const completedCount = ref(0)
 
+	// 处理题目状态变更
+	const handleQuestionStatusChanged = async (data) => {
+		console.log('收到题目状态变更事件:', data)
+		// 确保类型一致进行比较
+		const eventCategoryId = Number(data.categoryId)
+		console.log('事件中的categoryId:', eventCategoryId, '当前页面的categoryId:', categoryId.value)
+		
+		// 只有当变更的题目属于当前分类时才刷新
+		if (eventCategoryId === categoryId.value) {
+			console.log('开始刷新题目列表，当前categoryId:', categoryId.value)
+			try {
+				await loadQuestions()
+				console.log('题目列表刷新完成')
+			} catch (error) {
+				console.error('刷新题目列表失败:', error)
+				uni.showToast({
+					title: '刷新失败',
+					icon: 'none'
+				})
+			}
+		} else {
+			console.log('忽略其他分类的状态变更')
+		}
+	}
+
 	// 加载题目列表
 	const loadQuestions = async () => {
 		try {
 			isLoading.value = true
+			console.log('开始加载题目列表')
 			
 			// 确保数据库已初始化
 			await checkAndInitDB()
+			console.log('数据库初始化检查完成')
 			
 			// 检查question_map表中是否有数据
 			const checkSql = 'SELECT COUNT(*) as count FROM question_map'
 			const checkResult = await db.selectTableDataBySql(checkSql)
+			console.log('数据检查结果:', checkResult[0].count)
 			
 			// 如果没有数据，重新初始化数据库
 			if (checkResult[0].count === 0) {
+				console.log('数据库为空，开始初始化')
 				await initTables()
 				await importCategoryData()
 				await importQuestionMapData()
+				console.log('数据库初始化完成')
 			}
 			
 			// 获取题目列表
+			console.log('开始获取题目列表，categoryId:', categoryId.value)
 			const result = await getQuestionsWithStatus(categoryId.value)
+			console.log('获取到的题目数量:', result?.length || 0)
 			
 			if (result && result.length > 0) {
 				questions.value = result
 				// 计算已完成的题目数量
-				completedCount.value = questions.value.filter(q => q.last_visit_time).length
+				completedCount.value = questions.value.filter(q => q.is_learned).length
+				console.log('已完成的题目数量:', completedCount.value)
 			} else {
 				questions.value = []
 				completedCount.value = 0
+				console.log('未找到题目数据')
 			}
 			
 		} catch (error) {
@@ -216,9 +268,11 @@
 				title: '加载题目失败',
 				icon: 'none'
 			})
+			throw error // 向上抛出错误
 		} finally {
 			isLoading.value = false
 			isRefreshing.value = false
+			console.log('加载题目列表完成')
 		}
 	}
 
@@ -252,6 +306,7 @@
 	.container {
 		min-height: 100vh;
 		background-color: #f5f6fa;
+		padding-top: var(--status-bar-height);
 	}
 
 	.header {
@@ -261,7 +316,7 @@
 		align-items: center;
 		border-bottom: 1rpx solid #eee;
 		position: sticky;
-		top: 0;
+		top: var(--status-bar-height);
 		z-index: 100;
 	}
 
@@ -304,7 +359,7 @@
 	}
 
 	.question-list {
-		height: calc(100vh - 120rpx);
+		height: calc(100vh - var(--status-bar-height) - 100rpx);
 		padding: 16rpx;
 		box-sizing: border-box;
 	}

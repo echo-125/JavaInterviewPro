@@ -19,7 +19,9 @@
       <view class="question-content">
         <text class="question-title">{{ currentQuestion.title }}</text>
         <view class="question-meta">
-          <view class="study-badge" :class="{ studied: currentQuestion.last_study_time }">
+          <view class="study-badge" 
+                :class="{ studied: currentQuestion.last_study_time }"
+                @click="handleStudyBadgeClick">
             <text class="study-status">{{ currentQuestion.last_study_time ? '已学习' : '未学习' }}</text>
             <text v-if="currentQuestion.last_study_time" class="study-time">{{ formatDateTime(currentQuestion.last_study_time) }}</text>
           </view>
@@ -39,9 +41,10 @@
       <!-- 操作按钮区域 -->
       <view class="action-section">
         <button class="action-btn study-btn" 
-                :class="{ 'study-btn-active': isMarking }"
+                :class="{ 'study-btn-disabled': currentQuestion.last_study_time }"
+                :disabled="currentQuestion.last_study_time"
                 @click="toggleStudyStatus">
-          <text class="btn-text">{{ isMarking ? '我忘记了' : '我记住了' }}</text>
+          {{ currentQuestion.last_study_time ? '已学习' : '我已学习' }}
         </button>
         <button v-if="currentQuestion.uri" class="action-btn view-detail" @click="openDetail">
           查看详情
@@ -138,7 +141,12 @@ const loadQuestions = async () => {
     console.log('获取到的题目列表:', result)
     
     if (result && result.length > 0) {
-      questions.value = result
+      // 确保每个题目都有正确的学习状态
+      questions.value = result.map(question => ({
+        ...question,
+        last_study_time: question.learn_time || null,
+        is_favorite: question.is_favorite === 1
+      }))
       console.log('处理后的题目列表:', questions.value)
       console.log('当前题目:', questions.value[currentIndex.value])
     } else {
@@ -181,34 +189,37 @@ const updateStudyTime = async (questionId) => {
 
 // 切换收藏状态
 const toggleFavoriteStatus = async () => {
-  try {
-    const questionId = currentQuestion.value.id
-    if (!questionId) {
-      console.error('无效的题目ID')
-      return
+    try {
+        const questionId = currentQuestion.value.id
+        if (!questionId) {
+            console.error('无效的题目ID')
+            return
+        }
+        
+        console.log('切换收藏状态，当前收藏状态:', isFavorite.value)
+        
+        const success = await toggleFavorite(questionId)
+        if (!success) {
+            throw new Error('切换收藏状态失败')
+        }
+        
+        // 重新加载题目列表以更新收藏状态
+        await loadQuestions()
+        
+        // 发送刷新通知
+        notifyListRefresh()
+        
+        uni.showToast({
+            title: isFavorite.value ? '已取消收藏' : '已收藏',
+            icon: 'success'
+        })
+    } catch (error) {
+        console.error('切换收藏状态失败:', error)
+        uni.showToast({
+            title: '操作失败',
+            icon: 'none'
+        })
     }
-    
-    console.log('切换收藏状态，当前收藏状态:', isFavorite.value)
-    
-    const success = await toggleFavorite(questionId)
-    if (!success) {
-      throw new Error('切换收藏状态失败')
-    }
-    
-    // 重新加载题目列表以更新收藏状态
-    await loadQuestions()
-    
-    uni.showToast({
-      title: isFavorite.value ? '已取消收藏' : '已收藏',
-      icon: 'success'
-    })
-  } catch (error) {
-    console.error('切换收藏状态失败:', error)
-    uni.showToast({
-      title: '操作失败',
-      icon: 'none'
-    })
-  }
 }
 
 // 打开详情链接
@@ -220,38 +231,70 @@ const openDetail = () => {
   }
 }
 
+// 通知列表页面刷新
+const notifyListRefresh = () => {
+    uni.$emit('questionStatusChanged', {
+        categoryId: categoryId.value
+    })
+}
+
+// 处理学习状态徽章点击
+const handleStudyBadgeClick = async () => {
+    if (currentQuestion.value.last_study_time) {
+        try {
+            const questionId = currentQuestion.value.id
+            if (!questionId) return
+            
+            // 取消已学习状态
+            const success = await cancelLearnStatus(questionId)
+            if (!success) {
+                throw new Error('取消学习状态失败')
+            }
+            
+            // 更新本地数据
+            questions.value[currentIndex.value].last_study_time = null
+            
+            // 发送刷新通知
+            notifyListRefresh()
+            
+            uni.showToast({
+                title: '已重置学习状态',
+                icon: 'success'
+            })
+        } catch (error) {
+            console.error('取消学习状态失败:', error)
+            uni.showToast({
+                title: '操作失败',
+                icon: 'none'
+            })
+        }
+    }
+}
+
 // 切换学习状态
 const toggleStudyStatus = async () => {
-  try {
-    const questionId = currentQuestion.value.id
-    if (!questionId) return
-    
-    isMarking.value = !isMarking.value
-    
-    if (isMarking.value) {
-      // 标记为已学习
-      const result = await updateStudyTime(questionId)
-      if (result) {
-        questions.value[currentIndex.value].last_study_time = result.learn_time
-      }
-    } else {
-      // 取消已学习状态
-      const success = await cancelLearnStatus(questionId)
-      if (!success) {
-        throw new Error('取消学习状态失败')
-      }
-      
-      // 更新本地数据
-      questions.value[currentIndex.value].last_study_time = null
+    try {
+        const questionId = currentQuestion.value.id
+        if (!questionId || currentQuestion.value.last_study_time) return
+        
+        // 更新学习状态
+        const result = await updateStudyTime(questionId)
+        if (result) {
+            questions.value[currentIndex.value].last_study_time = result.learn_time
+            // 发送刷新通知
+            notifyListRefresh()
+            uni.showToast({
+                title: '已标记为学习',
+                icon: 'success'
+            })
+        }
+    } catch (error) {
+        console.error('更新学习状态失败:', error)
+        uni.showToast({
+            title: '操作失败',
+            icon: 'none'
+        })
     }
-  } catch (error) {
-    console.error('切换学习状态失败:', error)
-    uni.showToast({
-      title: '操作失败',
-      icon: 'none'
-    })
-    isMarking.value = !isMarking.value // 恢复状态
-  }
 }
 
 // 上一题
@@ -273,8 +316,23 @@ const nextQuestion = async () => {
 }
 
 // 返回上一页
-const navigateBack = () => {
-  uni.navigateBack()
+const navigateBack = async () => {
+    console.log('准备返回上一页，发送刷新通知')
+    // 确保发送数字类型的categoryId
+    const numericCategoryId = Number(categoryId.value)
+    console.log('发送的categoryId类型:', typeof numericCategoryId, '值:', numericCategoryId)
+    
+    // 发送刷新通知
+    uni.$emit('questionStatusChanged', {
+        categoryId: numericCategoryId
+    })
+    console.log('已发送刷新通知，categoryId:', numericCategoryId)
+    
+    // 等待一段时间确保事件被处理
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // 返回上一页
+    uni.navigateBack()
 }
 
 onMounted(async () => {
@@ -332,79 +390,59 @@ onMounted(async () => {
 
 <style>
 .container {
-  min-height: 100vh;
-  background-color: #f8f8f8;
-  display: flex;
-  flex-direction: column;
-  padding-top: calc(var(--status-bar-height) + 88rpx);
-  padding-bottom: 120rpx;
-  box-sizing: border-box;
+    min-height: 100vh;
+    background-color: #f5f6fa;
+    padding-top: var(--status-bar-height);
 }
 
 .nav-bar {
-  background-color: #fff;
-  padding: 20rpx 30rpx;
-  padding-top: var(--status-bar-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1rpx solid #eee;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  height: calc(var(--status-bar-height) + 88rpx);
-  box-sizing: border-box;
+    background-color: #fff;
+    padding: 20rpx 30rpx;
+    display: flex;
+    align-items: center;
+    border-bottom: 1rpx solid #eee;
+    position: sticky;
+    top: var(--status-bar-height);
+    z-index: 100;
 }
 
-.nav-left, .nav-right {
-  width: 60rpx;
+.nav-left {
+    width: 100rpx;
 }
 
 .nav-title {
-  flex: 1;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0 20rpx;
+    flex: 1;
+    text-align: center;
 }
 
-.title {
-  font-size: 32rpx;
-  font-weight: bold;
-  color: #333;
-  display: block;
-  width: 100%;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.subtitle {
-  font-size: 24rpx;
-  color: #666;
-  margin-top: 8rpx;
-  background-color: #f0f0f0;
-  padding: 4rpx 16rpx;
-  border-radius: 20rpx;
-  display: inline-block;
+.nav-right {
+    width: 100rpx;
+    text-align: right;
 }
 
 .nav-icon {
-  font-size: 40rpx;
-  color: #333;
+    font-size: 40rpx;
+    color: #333;
+}
+
+.title {
+    font-size: 36rpx;
+    font-weight: bold;
+    color: #333;
+    display: block;
+}
+
+.subtitle {
+    font-size: 24rpx;
+    color: #666;
+    margin-top: 8rpx;
+    display: block;
 }
 
 .content {
-  flex: 1;
-  padding: 20rpx;
-  width: 100%;
-  box-sizing: border-box;
-  overflow-y: auto;
+    height: calc(100vh - var(--status-bar-height) - 220rpx);
+    padding: 16rpx;
+    box-sizing: border-box;
 }
 
 .question-content {
@@ -440,10 +478,11 @@ onMounted(async () => {
   padding: 6rpx 16rpx;
   border-radius: 20rpx;
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .study-badge.studied {
-  background-color: rgba(76, 175, 80, 0.1);
+  background-color: rgba(33, 150, 243, 0.1);
 }
 
 .study-status {
@@ -453,7 +492,7 @@ onMounted(async () => {
 }
 
 .study-badge.studied .study-status {
-  color: #4caf50;
+  color: #2196f3;
 }
 
 .study-time {
@@ -466,7 +505,7 @@ onMounted(async () => {
 }
 
 .study-badge.studied .study-time {
-  color: #4caf50;
+  color: #2196f3;
 }
 
 .answer-section {
@@ -531,46 +570,36 @@ onMounted(async () => {
   text-align: center;
   border: none;
   min-width: 180rpx;
-  max-width: 40%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8rpx;
+  color: #fff;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease;
 }
 
-.btn-icon {
-  font-size: 32rpx;
-  margin-right: 4rpx;
+.action-btn:active {
+  transform: translateY(2rpx);
 }
 
 .study-btn {
-  background: linear-gradient(135deg, #4caf50, #2e7d32);
-  color: #fff;
-  border: none;
-  box-shadow: 0 2rpx 12rpx rgba(76, 175, 80, 0.2);
-  font-weight: bold;
-  transition: all 0.3s ease;
-}
-
-.study-btn-active {
-  background: linear-gradient(135deg, #f44336, #d32f2f);
-  box-shadow: 0 2rpx 12rpx rgba(244, 67, 54, 0.2);
+  background: linear-gradient(135deg, #4CAF50, #388E3C);
 }
 
 .study-btn:active {
-  transform: scale(0.98);
+  background: linear-gradient(135deg, #388E3C, #2E7D32);
+}
+
+.study-btn-disabled {
+  background: linear-gradient(135deg, #9E9E9E, #757575);
+  box-shadow: none;
+  opacity: 0.8;
+  pointer-events: none;
 }
 
 .view-detail {
   background: linear-gradient(135deg, #2979ff, #1565c0);
-  color: #fff;
-  box-shadow: 0 2rpx 12rpx rgba(41, 121, 255, 0.2);
 }
 
 .view-detail:active {
   background: linear-gradient(135deg, #1565c0, #0d47a1);
-  transform: translateY(2rpx);
 }
 
 .bottom-bar {

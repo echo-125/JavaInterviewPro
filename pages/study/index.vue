@@ -35,7 +35,7 @@
           ></view>
         </view>
         <view class="category-stats">
-          <text class="completed-count">已完成 {{ category.completedCount }}</text>
+          <text class="completed-count">已学习: {{ category.completedCount }}</text>
           <text class="progress-text">{{ category.progress }}%</text>
         </view>
       </view>
@@ -180,13 +180,27 @@ const onShow = () => {
 }
 
 onMounted(() => {
+  // 加载分类列表
   loadCategories()
+  
+  // 监听分类进度变更事件
+  uni.$on('categoryProgressChanged', handleCategoryProgressChanged)
+  console.log('已添加分类进度变更事件监听')
 })
 
-// 移除页面滚动监听
+// 移除事件监听
 onUnmounted(() => {
-  // 不需要移除监听，因为onPageScroll是生命周期函数
+  uni.$off('categoryProgressChanged', handleCategoryProgressChanged)
+  console.log('已移除分类进度变更事件监听')
 })
+
+// 处理分类进度变更
+const handleCategoryProgressChanged = async (data) => {
+  console.log('收到分类进度变更事件:', data)
+  // 刷新分类列表
+  await loadCategories()
+  console.log('分类列表刷新完成')
+}
 
 // 暴露页面生命周期函数
 defineExpose({

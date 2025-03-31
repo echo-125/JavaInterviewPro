@@ -288,7 +288,8 @@ export async function getQuestionsWithStatus(categoryId) {
                 q.title, 
                 q.sort_order,
                 q.is_favorite,
-                q.learn_time as last_visit_time,
+                q.is_learned,
+                q.learn_time,
                 q.answer,
                 q.uri
             FROM question_map q
@@ -299,7 +300,8 @@ export async function getQuestionsWithStatus(categoryId) {
         return result.map(item => ({
             ...item,
             is_favorite: item.is_favorite === 1,
-            last_visit_time: item.last_visit_time || null
+            is_learned: item.is_learned === 1,
+            last_study_time: item.is_learned === 1 ? item.learn_time : null
         }))
     } catch (error) {
         console.error('获取题目列表失败:', error)
