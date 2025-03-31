@@ -1,0 +1,69 @@
+{
+	"pages": [
+		{
+			"path": "pages/study/index",
+			"style": {
+				"navigationBarTitleText": "学习",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/favorite/index",
+			"style": {
+				"navigationBarTitleText": "收藏",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/profile/index",
+			"style": {
+				"navigationBarTitleText": "我的"
+			}
+		},
+		{
+			"path": "pages/question/detail",
+			"style": {
+				"navigationBarTitleText": "题目详情"
+			}
+		},
+		{
+			"path": "pages/question/webview",
+			"style": {
+				"navigationBarTitleText": "详细解析"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "Java面试题",
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"backgroundColor": "#F8F8F8"
+	},
+	"tabBar": {
+		"color": "#999999",
+		"selectedColor": "#007AFF",
+		"backgroundColor": "#FFFFFF",
+		"borderStyle": "black",
+		"list": [
+			{
+				"pagePath": "pages/study/index",
+				"text": "学习",
+				"iconPath": "static/tabbar/study.png",
+				"selectedIconPath": "static/tabbar/study-active.png"
+			},
+			{
+				"pagePath": "pages/favorite/index",
+				"text": "收藏",
+				"iconPath": "static/tabbar/favorite.png",
+				"selectedIconPath": "static/tabbar/favorite-active.png"
+			},
+			{
+				"pagePath": "pages/profile/index",
+				"text": "我的",
+				"iconPath": "static/tabbar/profile.png",
+				"selectedIconPath": "static/tabbar/profile-active.png"
+			}
+		]
+	},
+	"uniIdRouter": {}
+}
