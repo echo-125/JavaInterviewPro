@@ -54,14 +54,20 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import db from '@/common/database'
-import { checkAndInitDB } from '@/utils/dbInit'
+import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData, importInitialProgressData, importInitialFavoriteData } from '@/utils/dbInit'
+
+// 页面配置
+defineOptions({
+  navigationStyle: 'custom'
+})
 
 const categories = ref([])
 const searchText = ref('')
 const isLoading = ref(false)
 const isRefreshing = ref(false)
+const scrollTop = ref(0)
 
 // 过滤后的分类列表
 const filteredCategories = computed(() => {
@@ -75,13 +81,11 @@ const filteredCategories = computed(() => {
 const loadCategories = async () => {
   try {
     isLoading.value = true
-    console.log('开始加载分类列表...')
     
     // 确保数据库已初始化
     await checkAndInitDB()
     
     // 获取所有分类
-    console.log('查询分类数据...')
     let result = []
     try {
       result = await db.selectTableDataBySql(`
@@ -94,7 +98,27 @@ const loadCategories = async () => {
         GROUP BY c.id
         ORDER BY c.create_time ASC
       `)
-      //console.log('原始查询结果:', JSON.stringify(result))
+      
+      // 检查是否有数据
+      if (result.length === 0) {
+        await initTables()
+        await importCategoryData()
+        await importQuestionMapData()
+        await importInitialProgressData()
+        await importInitialFavoriteData()
+        
+        // 重新查询数据
+        result = await db.selectTableDataBySql(`
+          SELECT c.*, 
+            COUNT(q.id) as questionCount,
+            COUNT(CASE WHEN up.last_visit_time IS NOT NULL THEN 1 END) as completedCount
+          FROM category c
+          LEFT JOIN question_map q ON c.id = q.category_id
+          LEFT JOIN user_progress up ON q.id = up.question_id
+          GROUP BY c.id
+          ORDER BY c.create_time ASC
+        `)
+      }
     } catch (error) {
       console.error('查询分类数据失败:', JSON.stringify(error))
       return
@@ -109,14 +133,12 @@ const loadCategories = async () => {
       progress: item.questionCount ? Math.round((item.completedCount / item.questionCount) * 100) : 0
     }))
     
-    //console.log('处理后的分类列表:', JSON.stringify(categories.value))
   } catch (error) {
     console.error('加载分类失败:', error)
     uni.showToast({
       title: '加载分类失败',
       icon: 'none'
     })
-	await loadCategories();
   } finally {
     isLoading.value = false
     isRefreshing.value = false
@@ -130,41 +152,67 @@ const handleSearch = () => {
 
 // 跳转到题目列表
 const navigateToQuestions = (category) => {
-  console.log('准备跳转到题目页面:', category)
   const url = `/pages/study/questions?categoryId=${category.id}&categoryName=${encodeURIComponent(category.name)}`
-  console.log('跳转URL:', url)
   
-  uni.redirectTo({
+  uni.navigateTo({
     url: url,
-    success: () => {
-      console.log('页面跳转成功')
-    },
     fail: (err) => {
       console.error('页面跳转失败:', err)
-      // 如果redirectTo失败，尝试使用navigateTo
-      uni.navigateTo({
-        url: url,
-        success: () => {
-          console.log('使用navigateTo跳转成功')
-        },
-        fail: (err) => {
-          console.error('使用navigateTo跳转也失败:', err)
-        }
-      })
     }
   })
 }
 
 // 下拉刷新处理
 const onRefresh = async () => {
-  console.log('触发下拉刷新')
   isRefreshing.value = true
   await loadCategories()
 }
 
-onMounted(async () => {
-  console.log('页面加载完成，开始加载数据...')
-  await loadCategories()
+// 监听页面滚动
+const onPageScroll = (e) => {
+  scrollTop.value = e.scrollTop
+}
+
+// 页面隐藏时保存滚动位置
+const onHide = () => {
+  const route = '/pages/study/index'
+  uni.$store = uni.$store || {}
+  uni.$store.scrollPositions = uni.$store.scrollPositions || {}
+  uni.$store.scrollPositions[route] = scrollTop.value
+}
+
+// 页面显示时恢复滚动位置
+const onShow = () => {
+  const route = '/pages/study/index'
+  const saved = uni.$store?.scrollPositions?.[route]
+  if (saved !== undefined) {
+    // 使用nextTick确保DOM更新后再设置滚动位置
+    uni.$nextTick(() => {
+      const query = uni.createSelectorQuery()
+      query.select('.category-list').boundingClientRect()
+      query.exec((res) => {
+        if (res[0]) {
+          res[0].node.scrollTop = saved
+        }
+      })
+    })
+  }
+}
+
+onMounted(() => {
+  loadCategories()
+})
+
+// 移除页面滚动监听
+onUnmounted(() => {
+  // 不需要移除监听，因为onPageScroll是生命周期函数
+})
+
+// 暴露页面生命周期函数
+defineExpose({
+  onHide,
+  onShow,
+  onPageScroll
 })
 </script>
 
