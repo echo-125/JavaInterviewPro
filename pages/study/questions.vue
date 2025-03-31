@@ -9,7 +9,7 @@
 			</view>
 			<view class="header-center">
 				<text class="title">{{ categoryName }}</text>
-				<text class="subtitle">{{ questions.length }}题</text>
+				<text class="subtitle">已学习({{ completedCount }}/{{ questions.length }})</text>
 			</view>
 		</view>
 
@@ -22,12 +22,28 @@
 					<text class="question-title">{{ index + 1 }}. {{ question.title }}</text>
 					<view class="question-meta">
 						<view class="question-tags">
-							<text v-if="question.is_favorite" class="tag favorite">已收藏</text>
-							<text v-if="question.last_visit_time" class="tag completed">已完成</text>
+							<view v-if="question.is_favorite" class="tag favorite">
+								<text class="icon">★</text>
+								<text>已收藏</text>
+							</view>
+							<view v-else class="tag unfavorite">
+								<text class="icon">☆</text>
+								<text>未收藏</text>
+							</view>
+							<view v-if="question.last_visit_time" class="tag completed">
+								<text class="icon">✓</text>
+								<text>已完成</text>
+							</view>
+							<view v-else class="tag uncompleted">
+								<text class="icon">○</text>
+								<text>未学习</text>
+							</view>
 						</view>
 					</view>
 				</view>
-				<view class="question-arrow">></view>
+				<view class="question-arrow">
+					<text class="icon">›</text>
+				</view>
 			</view>
 
 			<!-- 加载状态 -->
@@ -159,6 +175,9 @@
 		onPageScroll
 	})
 
+	// 在 script setup 部分添加计算属性
+	const completedCount = ref(0)
+
 	// 加载题目列表
 	const loadQuestions = async () => {
 		try {
@@ -182,37 +201,31 @@
 			
 			// 获取题目列表
 			const sql = `
-				SELECT q.id, q.title, q.sort_order
+				SELECT q.id, q.title, q.sort_order,
+					CASE WHEN f.question_id IS NOT NULL THEN 1 ELSE 0 END as is_favorite,
+					p.last_visit_time
 				FROM question_map q
+				LEFT JOIN favorites f ON q.id = f.question_id
+				LEFT JOIN user_progress p ON q.id = p.question_id
 				WHERE q.category_id = ${categoryId.value}
 				ORDER BY q.sort_order ASC
 			`
 			
-			let result = await db.selectTableDataBySql(sql)
+			const result = await db.selectTableDataBySql(sql)
 			
-			// 如果基本查询有结果，再查询收藏和进度信息
 			if (result && result.length > 0) {
-				const questionIds = result.map(q => q.id)
-				
-				// 查询收藏信息
-				const favoriteSql = 'SELECT question_id FROM favorites WHERE question_id IN (' + questionIds.join(',') + ')'
-				const favoriteResult = await db.selectTableDataBySql(favoriteSql)
-				
-				// 查询进度信息
-				const progressSql = 'SELECT question_id, last_visit_time FROM user_progress WHERE question_id IN (' + questionIds.join(',') + ')'
-				const progressResult = await db.selectTableDataBySql(progressSql)
-				
-				// 合并数据
-				const favoriteSet = new Set(favoriteResult.map(f => f.question_id))
-				const progressMap = new Map(progressResult.map(p => [p.question_id, p.last_visit_time]))
-				
 				questions.value = result.map(item => ({
-					...item,
-					is_favorite: favoriteSet.has(item.id) ? 1 : 0,
-					last_visit_time: progressMap.get(item.id)
+					id: item.id,
+					title: item.title,
+					sort_order: item.sort_order,
+					is_favorite: item.is_favorite === 1,
+					last_visit_time: item.last_visit_time
 				}))
+				// 计算已完成的题目数量
+				completedCount.value = questions.value.filter(q => q.last_visit_time).length
 			} else {
 				questions.value = []
+				completedCount.value = 0
 			}
 			
 		} catch (error) {
@@ -292,25 +305,26 @@
 	.subtitle {
 		font-size: 24rpx;
 		color: #666;
-		margin-top: 10rpx;
+		margin-top: 8rpx;
 		display: block;
 	}
 
 	.question-list {
-		height: calc(100vh - 180rpx);
-		padding: 20rpx;
+		height: calc(100vh - 120rpx);
+		padding: 16rpx;
 		box-sizing: border-box;
 	}
 
 	.question-item {
 		background-color: #fff;
-		padding: 24rpx;
+		padding: 20rpx;
 		border-radius: 16rpx;
-		margin-bottom: 16rpx;
+		margin-bottom: 12rpx;
 		display: flex;
 		align-items: center;
 		box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
 		transition: all 0.3s ease;
+		min-height: 100rpx;
 	}
 
 	.question-item:active {
@@ -320,45 +334,86 @@
 
 	.question-info {
 		flex: 1;
-		margin-right: 16rpx;
+		margin-right: 12rpx;
+		display: flex;
+		align-items: center;
 	}
 
 	.question-title {
-		font-size: 30rpx;
+		flex: 1;
+		font-size: 28rpx;
 		color: #333;
-		line-height: 1.5;
-		display: block;
+		line-height: 1.4;
+		margin-right: 12rpx;
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		overflow: hidden;
 	}
 
 	.question-meta {
-		margin-top: 12rpx;
+		display: flex;
+		align-items: center;
+		min-width: 90rpx;
 	}
 
 	.question-tags {
 		display: flex;
-		gap: 8rpx;
+		flex-direction: column;
+		gap: 6rpx;
+		align-self: center;
 	}
 
 	.tag {
-		font-size: 20rpx;
-		padding: 4rpx 12rpx;
-		border-radius: 20rpx;
+		font-size: 18rpx;
+		padding: 2rpx 8rpx;
+		border-radius: 16rpx;
+		display: inline-flex;
+		align-items: center;
+		gap: 2rpx;
+		line-height: 1.2;
+		white-space: nowrap;
 	}
 
-	.tag.favorite {
+	.tag .icon {
+		font-size: 18rpx;
+		margin-right: 2rpx;
+	}
+
+	.tag.favorite, .tag.unfavorite {
 		background-color: #fff3e0;
 		color: #ff9800;
+		border: 1rpx solid #ffb74d;
 	}
 
-	.tag.completed {
+	.tag.completed, .tag.uncompleted {
 		background-color: #e8f5e9;
 		color: #4caf50;
+		border: 1rpx solid #81c784;
+	}
+
+	.tag.unfavorite {
+		background-color: #f5f5f5;
+		color: #9e9e9e;
+		border: 1rpx solid #e0e0e0;
+	}
+	
+	.tag.uncompleted {
+		background-color: #f5f5f5;
+		color: #9e9e9e;
+		border: 1rpx solid #e0e0e0;
 	}
 
 	.question-arrow {
-		font-size: 28rpx;
-		color: #ccc;
+		display: flex;
+		align-items: center;
 		padding: 0 8rpx;
+		align-self: center;
+	}
+
+	.question-arrow .icon {
+		font-size: 32rpx;
+		color: #ccc;
 	}
 
 	.loading,
