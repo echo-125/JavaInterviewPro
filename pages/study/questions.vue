@@ -242,8 +242,20 @@
 
 	// 跳转到题目详情
 	const navigateToQuestion = (question) => {
+		console.log('点击题目:', question)
+		const index = questions.value.findIndex(q => q.id === question.id)
+		console.log('题目索引:', index)
+		const url = `/pages/study/question?id=${question.id}&index=${index}&categoryId=${categoryId.value}&categoryName=${encodeURIComponent(categoryName.value)}`
+		console.log('跳转URL:', url)
 		uni.navigateTo({
-			url: `/pages/study/question?id=${question.id}&categoryId=${categoryId.value}&categoryName=${encodeURIComponent(categoryName.value)}`
+			url,
+			fail: (err) => {
+				console.error('页面跳转失败:', err)
+				uni.showToast({
+					title: '页面跳转失败',
+					icon: 'none'
+				})
+			}
 		})
 	}
 

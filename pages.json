@@ -15,6 +15,13 @@
 			}
 		},
 		{
+			"path": "pages/study/question",
+			"style": {
+				"navigationBarTitleText": "题目详情",
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/favorite/index",
 			"style": {
 				"navigationBarTitleText": "收藏",

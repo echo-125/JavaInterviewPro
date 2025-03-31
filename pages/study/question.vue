@@ -18,23 +18,34 @@
     <scroll-view scroll-y class="content">
       <view class="question-content">
         <text class="question-title">{{ currentQuestion.title }}</text>
-        <text class="question-text">{{ currentQuestion.content }}</text>
+        <view class="question-meta">
+          <view class="study-badge" :class="{ studied: currentQuestion.last_study_time }">
+            <text class="study-status">{{ currentQuestion.last_study_time ? '已学习' : '未学习' }}</text>
+            <text v-if="currentQuestion.last_study_time" class="study-time">{{ formatDateTime(currentQuestion.last_study_time) }}</text>
+          </view>
+        </view>
       </view>
 
       <!-- 答案部分 -->
       <view class="answer-section">
-        <view class="answer-header" @click="toggleAnswer">
-          <text class="answer-title">答案</text>
-          <text class="answer-icon">{{ showAnswer ? '▼' : '▶' }}</text>
+        <view class="answer-header">
+          <text class="answer-title">答案解析</text>
         </view>
-        <view v-if="showAnswer" class="answer-content">
-          <text class="answer-text">{{ currentQuestion.answer }}</text>
+        <view class="answer-content">
+          <rich-text class="answer-text" :nodes="currentQuestion.answer || '暂无答案'"></rich-text>
         </view>
       </view>
 
-      <!-- 详情链接 -->
-      <view v-if="currentQuestion.uri" class="detail-section">
-        <button class="detail-btn" @click="openDetail">查看详情</button>
+      <!-- 操作按钮区域 -->
+      <view class="action-section">
+        <button class="action-btn study-btn" 
+                :class="{ 'study-btn-active': isMarking }"
+                @click="toggleStudyStatus">
+          <text class="btn-text">{{ isMarking ? '我忘记了' : '我记住了' }}</text>
+        </button>
+        <button v-if="currentQuestion.uri" class="action-btn view-detail" @click="openDetail">
+          查看详情
+        </button>
       </view>
     </scroll-view>
 
@@ -61,13 +72,15 @@
 import { ref, computed, onMounted } from 'vue'
 import db from '@/common/database'
 import { checkAndInitDB } from '@/utils/dbInit'
+import { formatDateTime } from '@/utils/dateUtil'
 
 const categoryId = ref('')
 const categoryName = ref('')
 const questions = ref([])
 const currentIndex = ref(0)
-const showAnswer = ref(false)
 const isLoading = ref(false)
+const isMarking = ref(false)
+const isCancelling = ref(false)
 
 // 当前题目
 const currentQuestion = computed(() => {
@@ -112,33 +125,50 @@ const loadQuestions = async () => {
       }
     }
     
+    // 确保 categoryId 是数字类型
+    const numericCategoryId = parseInt(categoryId.value)
+    console.log('查询使用的 categoryId:', numericCategoryId)
+    
     // 获取题目列表
     const sql = `
-      SELECT q.*, 
+      SELECT 
+        q.id,
+        q.category_id,
+        q.uri,
+        q.title,
+        q.content,
+        q.answer,
+        q.sort_order,
+        q.create_time,
         CASE WHEN f.id IS NOT NULL THEN 1 ELSE 0 END as is_favorite,
-        up.last_visit_time as last_study_time
+        up.last_visit_time as last_study_time,
+        up.create_time as first_study_time
       FROM question_map q
       LEFT JOIN favorites f ON q.id = f.question_id
       LEFT JOIN user_progress up ON q.id = up.question_id
-      WHERE q.category_id = ?
+      WHERE q.category_id = ${numericCategoryId}
       ORDER BY q.sort_order ASC
     `
     
-    const result = await db.selectTableDataBySql(sql, [categoryId.value])
-    questions.value = result
+    console.log('执行的 SQL:', sql)
+    const result = await db.selectTableDataBySql(sql)
+    console.log('SQL 查询结果:', result)
     
-    // 更新学习时间
-    if (currentQuestion.value.id) {
-      await updateStudyTime(currentQuestion.value.id)
+    if (result && result.length > 0) {
+      questions.value = result.map(item => ({
+        ...item,
+        is_favorite: item.is_favorite === 1,
+        last_study_time: item.last_study_time || null,
+        first_study_time: item.first_study_time || null
+      }))
+      console.log('处理后的题目列表:', questions.value)
+      console.log('当前题目:', questions.value[currentIndex.value])
+    } else {
+      questions.value = []
+      console.log('未找到题目数据')
     }
-    
-    console.log('题目列表:', questions.value)
   } catch (error) {
     console.error('加载题目失败:', error)
-    // 发生错误时，等待100ms后重试
-    setTimeout(async () => {
-      await loadQuestions()
-    }, 100)
   } finally {
     isLoading.value = false
   }
@@ -147,13 +177,34 @@ const loadQuestions = async () => {
 // 更新学习时间
 const updateStudyTime = async (questionId) => {
   try {
+    // 确保 questionId 是有效的数字
+    const numericQuestionId = parseInt(questionId)
+    if (isNaN(numericQuestionId)) {
+      console.log('无效的 questionId:', questionId)
+      return null
+    }
+    
+    console.log('更新学习时间，questionId:', numericQuestionId)
+    
+    // 使用 INSERT OR REPLACE 语句
     const sql = `
       INSERT OR REPLACE INTO user_progress (question_id, last_visit_time, create_time)
-      VALUES (?, datetime('now', 'localtime'), datetime('now', 'localtime'))
+      VALUES (${numericQuestionId}, datetime('now', 'localtime'), 
+        COALESCE((SELECT create_time FROM user_progress WHERE question_id = ${numericQuestionId}), 
+        datetime('now', 'localtime')))
     `
-    await db.executeSql(sql, [questionId])
+    
+    console.log('执行SQL:', sql)
+    await db.executeSql(sql)
+    console.log('学习时间更新成功')
+    
+    // 查询更新后的时间
+    const selectSql = 'SELECT last_visit_time, create_time FROM user_progress WHERE question_id = ?'
+    const result = await db.selectTableDataBySql(selectSql, [numericQuestionId])
+    return result[0] || null
   } catch (error) {
-    console.error('更新学习时间失败:', error)
+    console.error('更新学习时间失败:', JSON.stringify(error))
+    return null
   }
 }
 
@@ -161,28 +212,39 @@ const updateStudyTime = async (questionId) => {
 const toggleFavorite = async () => {
   try {
     const questionId = currentQuestion.value.id
-    if (!questionId) return
+    if (!questionId) {
+      console.error('无效的题目ID')
+      return
+    }
+    
+    console.log('切换收藏状态，当前收藏状态:', isFavorite.value)
     
     if (isFavorite.value) {
       // 取消收藏
       const sql = 'DELETE FROM favorites WHERE question_id = ?'
       await db.executeSql(sql, [questionId])
+      console.log('取消收藏成功')
     } else {
       // 添加收藏
       const sql = 'INSERT INTO favorites (question_id, create_time) VALUES (?, datetime("now", "localtime"))'
       await db.executeSql(sql, [questionId])
+      console.log('添加收藏成功')
     }
     
     // 重新加载题目列表以更新收藏状态
     await loadQuestions()
+    
+    uni.showToast({
+      title: isFavorite.value ? '已取消收藏' : '已收藏',
+      icon: 'success'
+    })
   } catch (error) {
     console.error('切换收藏状态失败:', error)
+    uni.showToast({
+      title: '操作失败',
+      icon: 'none'
+    })
   }
-}
-
-// 切换答案显示
-const toggleAnswer = () => {
-  showAnswer.value = !showAnswer.value
 }
 
 // 打开详情链接
@@ -194,12 +256,44 @@ const openDetail = () => {
   }
 }
 
+// 切换学习状态
+const toggleStudyStatus = async () => {
+  try {
+    const questionId = currentQuestion.value.id
+    if (!questionId) return
+    
+    isMarking.value = !isMarking.value
+    
+    if (isMarking.value) {
+      // 标记为已学习
+      const times = await updateStudyTime(questionId)
+      if (times) {
+        questions.value[currentIndex.value].last_study_time = times.last_visit_time
+        questions.value[currentIndex.value].first_study_time = times.create_time
+      }
+    } else {
+      // 取消已学习状态
+      const sql = 'DELETE FROM user_progress WHERE question_id = ?'
+      await db.executeSql(sql, [questionId])
+      
+      // 更新本地数据
+      questions.value[currentIndex.value].last_study_time = null
+      questions.value[currentIndex.value].first_study_time = null
+    }
+  } catch (error) {
+    console.error('切换学习状态失败:', error)
+    uni.showToast({
+      title: '操作失败',
+      icon: 'none'
+    })
+    isMarking.value = !isMarking.value // 恢复状态
+  }
+}
+
 // 上一题
 const prevQuestion = async () => {
   if (currentIndex.value > 0) {
     currentIndex.value--
-    showAnswer.value = false
-    await updateStudyTime(currentQuestion.value.id)
   }
 }
 
@@ -207,8 +301,6 @@ const prevQuestion = async () => {
 const nextQuestion = async () => {
   if (currentIndex.value < totalQuestions.value - 1) {
     currentIndex.value++
-    showAnswer.value = false
-    await updateStudyTime(currentQuestion.value.id)
   }
 }
 
@@ -226,8 +318,14 @@ onMounted(async () => {
     const currentPage = pages[pages.length - 1]
     console.log('当前页面参数:', currentPage.$page.options)
     
-    const { categoryId: id, categoryName: name } = currentPage.$page.options
-    console.log('解析后的参数:', { id, name })
+    const { 
+      id,
+      categoryId: categoryIdParam,
+      categoryName: name,
+      index
+    } = currentPage.$page.options
+    
+    console.log('解析后的参数:', { id, categoryIdParam, name, index })
     
     if (!id || !name) {
       console.error('缺少必要的页面参数')
@@ -238,8 +336,13 @@ onMounted(async () => {
       return
     }
     
-    categoryId.value = id
+    // 使用传入的 categoryId，如果没有则使用 id
+    categoryId.value = categoryIdParam || id
     categoryName.value = decodeURIComponent(name)
+    // 设置当前题目索引
+    if (index !== undefined) {
+      currentIndex.value = parseInt(index)
+    }
     
     // 确保数据库已初始化
     await checkAndInitDB()
@@ -264,15 +367,26 @@ onMounted(async () => {
   background-color: #f8f8f8;
   display: flex;
   flex-direction: column;
+  padding-top: calc(var(--status-bar-height) + 88rpx);
+  padding-bottom: 120rpx;
+  box-sizing: border-box;
 }
 
 .nav-bar {
   background-color: #fff;
   padding: 20rpx 30rpx;
+  padding-top: var(--status-bar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1rpx solid #eee;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: calc(var(--status-bar-height) + 88rpx);
+  box-sizing: border-box;
 }
 
 .nav-left, .nav-right {
@@ -282,6 +396,11 @@ onMounted(async () => {
 .nav-title {
   flex: 1;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20rpx;
 }
 
 .title {
@@ -289,13 +408,21 @@ onMounted(async () => {
   font-weight: bold;
   color: #333;
   display: block;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .subtitle {
   font-size: 24rpx;
   color: #666;
-  margin-top: 4rpx;
-  display: block;
+  margin-top: 8rpx;
+  background-color: #f0f0f0;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  display: inline-block;
 }
 
 .nav-icon {
@@ -305,7 +432,10 @@ onMounted(async () => {
 
 .content {
   flex: 1;
-  padding: 30rpx;
+  padding: 20rpx;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .question-content {
@@ -313,102 +443,208 @@ onMounted(async () => {
   padding: 30rpx;
   border-radius: 12rpx;
   margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .question-title {
-  font-size: 36rpx;
-  font-weight: bold;
+  font-size: 32rpx;
   color: #333;
-  margin-bottom: 20rpx;
+  line-height: 1.8;
   display: block;
+  font-weight: bold;
+  width: 100%;
+  word-break: break-all;
 }
 
-.question-text {
-  font-size: 30rpx;
+.question-meta {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+}
+
+.study-badge {
+  display: inline-flex;
+  align-items: center;
+  background-color: #f5f5f5;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  transition: all 0.3s ease;
+}
+
+.study-badge.studied {
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+.study-status {
+  font-size: 24rpx;
   color: #666;
-  line-height: 1.6;
-  display: block;
+  transition: color 0.3s ease;
+}
+
+.study-badge.studied .study-status {
+  color: #4caf50;
+}
+
+.study-time {
+  font-size: 24rpx;
+  color: #666;
+  margin-left: 8rpx;
+  border-left: 2rpx solid #ddd;
+  padding-left: 8rpx;
+  transition: color 0.3s ease;
+}
+
+.study-badge.studied .study-time {
+  color: #4caf50;
 }
 
 .answer-section {
   background-color: #fff;
   border-radius: 12rpx;
   overflow: hidden;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.05);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .answer-header {
-  padding: 20rpx 30rpx;
+  padding: 24rpx 30rpx;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: #f8f9fa;
   border-bottom: 1rpx solid #eee;
 }
 
 .answer-title {
-  font-size: 32rpx;
-  font-weight: bold;
+  font-size: 28rpx;
   color: #333;
+  font-weight: bold;
 }
 
 .answer-icon {
-  font-size: 24rpx;
-  color: #666;
+  font-size: 28rpx;
+  color: #2979ff;
+  margin-left: 10rpx;
 }
 
 .answer-content {
   padding: 30rpx;
+  background-color: #fff;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .answer-text {
-  font-size: 30rpx;
-  color: #666;
-  line-height: 1.6;
-  display: block;
-}
-
-.detail-section {
-  margin-top: 20rpx;
-  padding: 0 30rpx;
-}
-
-.detail-btn {
-  background-color: #007AFF;
-  color: #fff;
   font-size: 28rpx;
-  padding: 20rpx;
+  color: #333;
+  line-height: 1.8;
+  width: 100%;
+  word-break: break-all;
+}
+
+.action-section {
+  margin: 20rpx 0;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  gap: 20rpx;
+}
+
+.action-btn {
+  font-size: 28rpx;
+  padding: 16rpx 40rpx;
   border-radius: 8rpx;
   text-align: center;
+  border: none;
+  min-width: 180rpx;
+  max-width: 40%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  transition: all 0.3s ease;
+}
+
+.btn-icon {
+  font-size: 32rpx;
+  margin-right: 4rpx;
+}
+
+.study-btn {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2rpx 12rpx rgba(76, 175, 80, 0.2);
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.study-btn-active {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+  box-shadow: 0 2rpx 12rpx rgba(244, 67, 54, 0.2);
+}
+
+.study-btn:active {
+  transform: scale(0.98);
+}
+
+.view-detail {
+  background: linear-gradient(135deg, #2979ff, #1565c0);
+  color: #fff;
+  box-shadow: 0 2rpx 12rpx rgba(41, 121, 255, 0.2);
+}
+
+.view-detail:active {
+  background: linear-gradient(135deg, #1565c0, #0d47a1);
+  transform: translateY(2rpx);
 }
 
 .bottom-bar {
   background-color: #fff;
-  padding: 20rpx 30rpx;
+  padding: 20rpx;
   display: flex;
   justify-content: space-between;
   border-top: 1rpx solid #eee;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: 120rpx;
+  box-sizing: border-box;
 }
 
 .nav-btn {
   display: flex;
   align-items: center;
-  padding: 20rpx 40rpx;
+  padding: 16rpx 32rpx;
   border-radius: 8rpx;
-  background-color: #f5f5f5;
+  background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
+  transition: all 0.3s;
+  min-width: 200rpx;
+  justify-content: center;
+  margin: 0 10rpx;
+}
+
+.nav-btn:active {
+  background: linear-gradient(135deg, #e0e0e0, #bdbdbd);
+  transform: translateY(2rpx);
 }
 
 .nav-btn.disabled {
   opacity: 0.5;
-}
-
-.btn-icon {
-  font-size: 32rpx;
-  color: #666;
-  margin: 0 10rpx;
+  pointer-events: none;
 }
 
 .btn-text {
   font-size: 28rpx;
   color: #666;
+  font-weight: bold;
 }
 
 .loading {
