@@ -15,8 +15,13 @@ export default {
 			
 			// 隐藏loading提示
 			uni.hideLoading()
+			
+			// 数据库初始化完成后，跳转到首页
+			uni.reLaunch({
+				url: '/pages/study/index'
+			})
 		} catch (error) {
-			console.error('数据库初始化失败:', error)
+			console.error('数据库初始化失败:', JSON.stringify(error))
 			uni.hideLoading()
 			uni.showToast({
 				title: '数据库初始化失败',

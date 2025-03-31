@@ -60,6 +60,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import db from '@/common/database'
+import { checkAndInitDB } from '@/utils/dbInit'
 
 const categoryId = ref('')
 const categoryName = ref('')
@@ -114,9 +115,11 @@ const loadQuestions = async () => {
     // 获取题目列表
     const sql = `
       SELECT q.*, 
-        CASE WHEN f.id IS NOT NULL THEN 1 ELSE 0 END as is_favorite
+        CASE WHEN f.id IS NOT NULL THEN 1 ELSE 0 END as is_favorite,
+        up.last_visit_time as last_study_time
       FROM question_map q
       LEFT JOIN favorites f ON q.id = f.question_id
+      LEFT JOIN user_progress up ON q.id = up.question_id
       WHERE q.category_id = ?
       ORDER BY q.sort_order ASC
     `
@@ -145,11 +148,10 @@ const loadQuestions = async () => {
 const updateStudyTime = async (questionId) => {
   try {
     const sql = `
-      UPDATE question_map 
-      SET last_study_time = datetime('now', 'localtime')
-      WHERE id = ?
+      INSERT OR REPLACE INTO user_progress (question_id, last_visit_time, create_time)
+      VALUES (?, datetime('now', 'localtime'), datetime('now', 'localtime'))
     `
-    await db.selectTableDataBySql(sql, [questionId])
+    await db.executeSql(sql, [questionId])
   } catch (error) {
     console.error('更新学习时间失败:', error)
   }
@@ -164,11 +166,11 @@ const toggleFavorite = async () => {
     if (isFavorite.value) {
       // 取消收藏
       const sql = 'DELETE FROM favorites WHERE question_id = ?'
-      await db.selectTableDataBySql(sql, [questionId])
+      await db.executeSql(sql, [questionId])
     } else {
       // 添加收藏
       const sql = 'INSERT INTO favorites (question_id, create_time) VALUES (?, datetime("now", "localtime"))'
-      await db.selectTableDataBySql(sql, [questionId])
+      await db.executeSql(sql, [questionId])
     }
     
     // 重新加载题目列表以更新收藏状态
@@ -215,17 +217,44 @@ const navigateBack = () => {
   uni.navigateBack()
 }
 
-onMounted(() => {
-  // 获取页面参数
-  const pages = getCurrentPages()
-  const currentPage = pages[pages.length - 1]
-  const { categoryId: id, categoryName: name } = currentPage.$page.options
+onMounted(async () => {
+  console.log('question页面加载完成')
   
-  categoryId.value = id
-  categoryName.value = decodeURIComponent(name)
-  
-  // 加载题目列表
-  loadQuestions()
+  try {
+    // 获取页面参数
+    const pages = getCurrentPages()
+    const currentPage = pages[pages.length - 1]
+    console.log('当前页面参数:', currentPage.$page.options)
+    
+    const { categoryId: id, categoryName: name } = currentPage.$page.options
+    console.log('解析后的参数:', { id, name })
+    
+    if (!id || !name) {
+      console.error('缺少必要的页面参数')
+      uni.showToast({
+        title: '参数错误',
+        icon: 'none'
+      })
+      return
+    }
+    
+    categoryId.value = id
+    categoryName.value = decodeURIComponent(name)
+    
+    // 确保数据库已初始化
+    await checkAndInitDB()
+    console.log('数据库初始化完成')
+    
+    // 加载题目列表
+    await loadQuestions()
+    console.log('题目列表加载完成')
+  } catch (error) {
+    console.error('页面初始化失败:', error)
+    uni.showToast({
+      title: '加载失败',
+      icon: 'none'
+    })
+  }
 })
 </script>
 

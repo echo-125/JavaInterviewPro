@@ -84,7 +84,7 @@ async function initTables() {
 
         console.log('数据库表创建成功')
     } catch (error) {
-        console.error('创建数据库表失败:', error)
+        console.error('创建数据库表失败:', JSON.stringify(error))
         throw error
     }
 }
@@ -94,9 +94,6 @@ async function initTables() {
  */
 async function importCategoryData() {
     try {
-        // 清空现有数据
-        await db.executeSql('DELETE FROM category')
-        
         // 导入新数据
         for (const category of categoryData) {
             const sql = `
@@ -257,7 +254,7 @@ async function checkAndInitDB() {
         
         console.log('数据库初始化检查完成')
     } catch (error) {
-        console.error('数据库初始化失败:', error)
+        console.error('数据库初始化失败:', JSON.stringify(error))
         throw error
     }
 }

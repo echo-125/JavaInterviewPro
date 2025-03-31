@@ -56,6 +56,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import db from '@/common/database'
+import { checkAndInitDB } from '@/utils/dbInit'
 
 const categories = ref([])
 const searchText = ref('')
@@ -76,6 +77,9 @@ const loadCategories = async () => {
     isLoading.value = true
     console.log('开始加载分类列表...')
     
+    // 确保数据库已初始化
+    await checkAndInitDB()
+    
     // 获取所有分类
     console.log('查询分类数据...')
     let result = []
@@ -90,9 +94,9 @@ const loadCategories = async () => {
         GROUP BY c.id
         ORDER BY c.create_time ASC
       `)
-      console.log('原始查询结果:', JSON.stringify(result))
+      //console.log('原始查询结果:', JSON.stringify(result))
     } catch (error) {
-      console.error('查询分类数据失败:', error)
+      console.error('查询分类数据失败:', JSON.stringify(error))
       return
     }
     
@@ -112,6 +116,7 @@ const loadCategories = async () => {
       title: '加载分类失败',
       icon: 'none'
     })
+	await loadCategories();
   } finally {
     isLoading.value = false
     isRefreshing.value = false
@@ -125,8 +130,28 @@ const handleSearch = () => {
 
 // 跳转到题目列表
 const navigateToQuestions = (category) => {
-  uni.navigateTo({
-    url: `/pages/study/questions?categoryId=${category.id}&categoryName=${encodeURIComponent(category.name)}`
+  console.log('准备跳转到题目页面:', category)
+  const url = `/pages/study/questions?categoryId=${category.id}&categoryName=${encodeURIComponent(category.name)}`
+  console.log('跳转URL:', url)
+  
+  uni.redirectTo({
+    url: url,
+    success: () => {
+      console.log('页面跳转成功')
+    },
+    fail: (err) => {
+      console.error('页面跳转失败:', err)
+      // 如果redirectTo失败，尝试使用navigateTo
+      uni.navigateTo({
+        url: url,
+        success: () => {
+          console.log('使用navigateTo跳转成功')
+        },
+        fail: (err) => {
+          console.error('使用navigateTo跳转也失败:', err)
+        }
+      })
+    }
   })
 }
 
