@@ -33,7 +33,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import db from '@/common/database'
 import { formatDateTime } from '@/utils/dateUtil'
 
@@ -119,8 +119,27 @@ const navigateToQuestion = (question) => {
   })
 }
 
+// 监听题目状态变化事件
+const handleQuestionStatusChanged = () => {
+  loadFavorites()
+}
+
 onMounted(() => {
   loadFavorites()
+  // 添加事件监听
+  uni.$on('questionStatusChanged', handleQuestionStatusChanged)
+})
+
+// 页面卸载时移除事件监听
+onUnmounted(() => {
+  uni.$off('questionStatusChanged', handleQuestionStatusChanged)
+})
+
+// 定义页面生命周期函数
+defineExpose({
+  onShow() {
+    loadFavorites()
+  }
 })
 </script>
 
