@@ -279,36 +279,38 @@ export async function getRecentQuestions(limit = 5) {
  * @param {number} categoryId 分类ID
  * @returns {Promise<Array>} 返回题目列表
  */
-export async function getQuestionsWithStatus(categoryId) {
-    await openDB()
-    try {
-        const sql = `
-            SELECT 
-                q.id, 
-                q.title, 
-                q.sort_order,
-                q.is_favorite,
-                q.is_learned,
-                q.learn_time,
-                q.answer,
-                q.uri
-            FROM question_map q
-            WHERE q.category_id = ${categoryId}
-            ORDER BY q.sort_order ASC
-        `
-        const result = await db.selectTableDataBySql(sql)
-        return result.map(item => ({
-            ...item,
-            is_favorite: item.is_favorite === 1,
-            is_learned: item.is_learned === 1,
-            last_study_time: item.is_learned === 1 ? item.learn_time : null
-        }))
-    } catch (error) {
-        console.error('获取题目列表失败:', error)
-        return []
-    } finally {
-        await closeDB()
-    }
+export const getQuestionsWithStatus = async (categoryId) => {
+	try {
+		// 获取分类下的所有题目
+		const sql = `
+			SELECT 
+				q.id,
+				q.title,
+				q.sort_order,
+				q.is_favorite,
+				q.is_learned,
+				q.learn_time,
+				q.answer,
+				q.uri
+			FROM question_map q
+			WHERE q.category_id = ${categoryId}
+			ORDER BY 
+				q.is_learned ASC,  -- 未学习的排在前面
+				q.sort_order ASC   -- 按原始序号排序
+		`
+		
+		const result = await db.selectTableDataBySql(sql)
+		
+		return result.map(item => ({
+			...item,
+			is_favorite: Boolean(item.is_favorite),
+			is_learned: Boolean(item.is_learned),
+			last_study_time: item.is_learned ? item.learn_time : null
+		}))
+	} catch (error) {
+		console.error('获取题目列表失败:', error)
+		throw error
+	}
 }
 
 /**

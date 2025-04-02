@@ -19,7 +19,7 @@
 			<view v-for="(question, index) in questions" :key="question.id" class="question-item"
 				@click="navigateToQuestion(question)">
 				<view class="question-info">
-					<text class="question-title">{{ index + 1 }}. {{ question.title }}</text>
+					<text class="question-title">{{ question.sort_order }}. {{ question.title }}</text>
 					<view class="question-meta">
 						<view class="question-tags">
 							<view v-if="question.is_favorite" class="tag favorite">
