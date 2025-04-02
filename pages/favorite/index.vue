@@ -1,36 +1,45 @@
 <template>
   <view class="container">
     <view class="header">
-      <text class="title">我的收藏</text>
-      <text class="subtitle">共{{favorites.length}}题</text>
+      <view class="header-row">
+        <text class="title">收藏</text>
+        <text class="subtitle">共{{favorites.length}}题</text>
+      </view>
     </view>
-    
-    <view class="favorite-list">
+    <scroll-view 
+      scroll-y 
+      class="favorite-list"
+      refresher-enabled
+      :refresher-triggered="isRefreshing"
+      @refresherrefresh="onRefresh"
+    >
       <view v-for="(item, index) in favorites" :key="index" 
             class="favorite-item" 
             @click="navigateToQuestion(item)">
         <view class="question-info">
           <text class="question-title">{{item.title}}</text>
-          <text class="question-category">{{item.category_name}}</text>
-        </view>
-        <view class="question-meta">
-          <text class="study-time">上次学习: {{formatDate(item.last_study_time)}}</text>
+          <view class="meta-row">
+            <text class="question-category">{{item.category_name}}</text>
+            <text class="study-time" v-if="item.learn_time">上次学习: {{formatDateTime(item.learn_time)}}</text>
+          </view>
         </view>
       </view>
-    </view>
-    
-    <view class="empty-state" v-if="favorites.length === 0">
-      <text class="empty-text">暂无收藏题目</text>
-    </view>
+      
+      <view class="empty-state" v-if="favorites.length === 0">
+        <text class="empty-text">暂无收藏题目</text>
+      </view>
+    </scroll-view>
   </view>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import db from '@/common/database'
+import { formatDateTime } from '@/utils/dateUtil'
 
 const favorites = ref([])
 const isLoading = ref(false)
+const isRefreshing = ref(false)
 
 // 加载收藏列表
 const loadFavorites = async () => {
@@ -40,7 +49,7 @@ const loadFavorites = async () => {
     // 检查数据库是否打开
     let isOpen = false
     try {
-      isOpen = await db.isOpen()
+      isOpen = db.isOpen()
       console.log('数据库是否打开:', isOpen)
     } catch (error) {
       console.error('检查数据库状态失败:', error)
@@ -49,7 +58,7 @@ const loadFavorites = async () => {
     if (!isOpen) {
       console.log('数据库未打开，尝试打开数据库...')
       try {
-        await db.openDatabase()
+        await db.open()
         console.log('数据库打开成功')
       } catch (error) {
         console.error('打开数据库失败:', error)
@@ -62,11 +71,16 @@ const loadFavorites = async () => {
     
     // 查询收藏列表
     const sql = `
-      SELECT q.*, c.name as category_name
+      SELECT 
+        q.id,
+        q.title,
+        q.learn_time,
+        q.category_id,
+        c.name as category_name
       FROM question_map q
       LEFT JOIN category c ON q.category_id = c.id
-      INNER JOIN favorites f ON q.id = f.question_id
-      ORDER BY f.create_time DESC
+      WHERE q.is_favorite = 1
+      ORDER BY q.favorite_time DESC
     `
     
     const result = await db.selectTableDataBySql(sql)
@@ -74,32 +88,34 @@ const loadFavorites = async () => {
     console.log('收藏列表:', favorites.value)
   } catch (error) {
     console.error('加载收藏失败:', error)
-    // 发生错误时，等待100ms后重试
-    setTimeout(async () => {
-      await loadFavorites()
-    }, 100)
+    uni.showToast({
+      title: '加载失败',
+      icon: 'none'
+    })
   } finally {
     isLoading.value = false
+    isRefreshing.value = false
   }
+}
+
+// 下拉刷新处理
+const onRefresh = async () => {
+  isRefreshing.value = true
+  await loadFavorites()
 }
 
 // 跳转到题目详情
 const navigateToQuestion = (question) => {
+  const url = `/pages/study/question?id=${question.id}&categoryId=${question.category_id}&categoryName=${encodeURIComponent(question.category_name)}&from=favorite`
   uni.navigateTo({
-    url: '/pages/question/detail?id=' + question.id
-  })
-}
-
-// 格式化日期
-const formatDate = (timestamp) => {
-  if (!timestamp) return '未学习'
-  const date = new Date(timestamp)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
+    url,
+    fail: (err) => {
+      console.error('页面跳转失败:', err)
+      uni.showToast({
+        title: '页面跳转失败',
+        icon: 'none'
+      })
+    }
   })
 }
 
@@ -111,28 +127,38 @@ onMounted(() => {
 <style>
 .container {
   padding: 20rpx;
+  height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .header {
-  padding: 30rpx 0;
+  padding: 40rpx 0 20rpx;
   text-align: center;
 }
 
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+}
+
 .title {
-  font-size: 36rpx;
+  font-size: 28rpx;
   font-weight: bold;
-  display: block;
+  color: #333;
 }
 
 .subtitle {
   font-size: 24rpx;
   color: #666;
-  margin-top: 10rpx;
-  display: block;
 }
 
 .favorite-list {
-  margin-top: 30rpx;
+  flex: 1;
+  margin-top: 20rpx;
 }
 
 .favorite-item {
@@ -155,20 +181,22 @@ onMounted(() => {
   display: block;
 }
 
+.meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .question-category {
   font-size: 24rpx;
   color: #666;
 }
 
-.question-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .study-time {
   font-size: 24rpx;
   color: #999;
+  border-left: 2rpx solid #eee;
+  padding-left: 20rpx;
 }
 
 .empty-state {

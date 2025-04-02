@@ -1,5 +1,5 @@
 <script>
-import { checkAndInitDB } from '@/utils/dbInit.js'
+import { checkAndInitDB } from '@/common/dbInit.js'
 
 export default {
 	onLaunch: async function() {

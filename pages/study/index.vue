@@ -55,7 +55,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData } from '@/utils/dbInit'
+import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData } from '@/common/dbInit'
 import { getCategories } from '@/api/api'
 
 // 页面配置

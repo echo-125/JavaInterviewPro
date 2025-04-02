@@ -79,7 +79,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import db from '@/common/database'
-import { checkAndInitDB } from '@/utils/dbInit'
+import { checkAndInitDB } from '@/common/dbInit'
 import { formatDateTime } from '@/utils/dateUtil'
 import { 
     getQuestionById, 
@@ -126,12 +126,39 @@ const loadQuestions = async () => {
         const result = await getQuestionsWithStatus(categoryId.value)
         
         if (result && result.length > 0) {
-            // 确保每个题目都有正确的学习状态
+            // 确保每个题目都有正确的学习状态和收藏状态
             questions.value = result.map(question => ({
                 ...question,
                 last_study_time: question.learn_time || null,
                 is_favorite: Boolean(question.is_favorite)
             }))
+            
+            // 如果是从收藏页面进入，且当前题目不在列表中，添加当前题目
+            const pages = getCurrentPages()
+            const currentPage = pages[pages.length - 1]
+            const { from } = currentPage.$page.options
+            
+            if (from === 'favorite') {
+                const currentQuestionId = parseInt(questionId.value)
+                const exists = questions.value.some(q => q.id === currentQuestionId)
+                if (!exists) {
+                    const currentQuestion = await getQuestionById(currentQuestionId)
+                    if (currentQuestion) {
+                        // 从收藏页面进入时，强制设置收藏状态为 true
+                        questions.value.push({
+                            ...currentQuestion,
+                            last_study_time: currentQuestion.learn_time || null,
+                            is_favorite: true
+                        })
+                    }
+                } else {
+                    // 如果题目已存在，确保收藏状态为 true
+                    const questionIndex = questions.value.findIndex(q => q.id === currentQuestionId)
+                    if (questionIndex !== -1) {
+                        questions.value[questionIndex].is_favorite = true
+                    }
+                }
+            }
         } else {
             questions.value = []
         }
@@ -163,7 +190,12 @@ const updateStudyTime = async (questionId) => {
         
         // 获取更新后的题目信息
         const result = await getQuestionById(numericQuestionId)
-        return result ? { learn_time: result.last_study_time } : null
+        if (result) {
+            // 更新本地数据
+            questions.value[currentIndex.value].last_study_time = result.learn_time
+            return { learn_time: result.learn_time }
+        }
+        return null
     } catch (error) {
         console.error('更新学习时间失败:', error)
         return null
@@ -190,7 +222,6 @@ const toggleFavoriteStatus = async () => {
             throw new Error('切换收藏状态失败')
         }
         
-        console.log('重新加载题目列表')
         // 重新加载题目列表以更新收藏状态
         await loadQuestions()
         

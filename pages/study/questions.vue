@@ -66,7 +66,7 @@
 		onUnmounted
 	} from 'vue'
 	import db from '@/common/database'
-	import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData } from '@/utils/dbInit'
+	import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData } from '@/common/dbInit'
 	import { onBackPress } from '@dcloudio/uni-app'
 	import { getQuestionsWithStatus, getCategoryProgress } from '@/api/api'
 

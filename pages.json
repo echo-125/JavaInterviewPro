@@ -26,6 +26,7 @@
 			"path": "pages/favorite/index",
 			"style": {
 				"navigationBarTitleText": "收藏",
+				"navigationStyle": "custom",
 				"enablePullDownRefresh": true
 			}
 		},

@@ -1,6 +1,7 @@
-import db from '@/common/database.js'
+import db from './database'
 import categoryData from '@/static/data/Category.json'
 import questionMapData from '@/static/data/question_map.json'
+
 /**
  * 检查表是否存在
  */
@@ -194,9 +195,17 @@ async function checkAndInitDB() {
     }
 }
 
+// 在应用启动时初始化数据库
+// #ifdef APP-PLUS
+plus.globalEvent.addEventListener('plusready', () => {
+    console.log('plusready 事件触发，初始化数据库')
+    checkAndInitDB()
+})
+// #endif
+
 export {
     checkAndInitDB,
     initTables,
     importCategoryData,
     importQuestionMapData
-}
+} 
