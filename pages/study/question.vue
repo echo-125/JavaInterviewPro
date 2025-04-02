@@ -144,18 +144,12 @@ const loadQuestions = async () => {
                 if (!exists) {
                     const currentQuestion = await getQuestionById(currentQuestionId)
                     if (currentQuestion) {
-                        // 从收藏页面进入时，强制设置收藏状态为 true
+                        // 从收藏页面进入时，确保收藏状态为 true
                         questions.value.push({
                             ...currentQuestion,
                             last_study_time: currentQuestion.learn_time || null,
                             is_favorite: true
                         })
-                    }
-                } else {
-                    // 如果题目已存在，确保收藏状态为 true
-                    const questionIndex = questions.value.findIndex(q => q.id === currentQuestionId)
-                    if (questionIndex !== -1) {
-                        questions.value[questionIndex].is_favorite = true
                     }
                 }
             }
@@ -192,8 +186,9 @@ const updateStudyTime = async (questionId) => {
         const result = await getQuestionById(numericQuestionId)
         if (result) {
             // 更新本地数据
-            questions.value[currentIndex.value].last_study_time = result.learn_time
-            return { learn_time: result.learn_time }
+            const currentTime = new Date().getTime()
+            questions.value[currentIndex.value].last_study_time = currentTime
+            return { learn_time: currentTime }
         }
         return null
     } catch (error) {
@@ -222,14 +217,15 @@ const toggleFavoriteStatus = async () => {
             throw new Error('切换收藏状态失败')
         }
         
-        // 重新加载题目列表以更新收藏状态
-        await loadQuestions()
+        // 直接更新当前题目的收藏状态，而不是重新加载
+        const newIsFavorite = !currentQuestion.value.is_favorite
+        questions.value[currentIndex.value].is_favorite = newIsFavorite
         
         // 发送刷新通知
         notifyListRefresh()
         
         uni.showToast({
-            title: isFavorite.value ? '已取消收藏' : '已收藏',
+            title: newIsFavorite ? '已收藏' : '已取消收藏',
             icon: 'success'
         })
     } catch (error) {
