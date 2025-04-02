@@ -10,7 +10,7 @@
         <text class="subtitle">{{ currentIndex + 1 }}/{{ totalQuestions }}</text>
       </view>
       <view class="nav-right">
-        <text class="nav-icon" @click="toggleFavorite">{{ isFavorite ? '★' : '☆' }}</text>
+        <text class="nav-icon" @click="toggleFavoriteStatus">{{ isFavorite ? '★' : '☆' }}</text>
       </view>
     </view>
 
@@ -113,25 +113,8 @@ const loadQuestions = async () => {
     try {
         isLoading.value = true
         
-        // 检查数据库是否打开
-        let isOpen = false
-        try {
-            isOpen = await db.isOpen()
-        } catch (error) {
-            console.error('检查数据库状态失败:', error)
-        }
-        
-        if (!isOpen) {
-            try {
-                await db.openDatabase()
-            } catch (error) {
-                console.error('打开数据库失败:', error)
-                setTimeout(async () => {
-                    await loadQuestions()
-                }, 100)
-                return
-            }
-        }
+        // 确保数据库已初始化
+        await checkAndInitDB()
         
         // 获取该分类下的所有题目
         const result = await getQuestionsWithStatus(categoryId.value)
@@ -141,13 +124,17 @@ const loadQuestions = async () => {
             questions.value = result.map(question => ({
                 ...question,
                 last_study_time: question.learn_time || null,
-                is_favorite: question.is_favorite === 1
+                is_favorite: Boolean(question.is_favorite)
             }))
         } else {
             questions.value = []
         }
     } catch (error) {
         console.error('加载题目失败:', error)
+        uni.showToast({
+            title: '加载题目失败',
+            icon: 'none'
+        })
     } finally {
         isLoading.value = false
     }
@@ -180,17 +167,24 @@ const updateStudyTime = async (questionId) => {
 // 切换收藏状态
 const toggleFavoriteStatus = async () => {
     try {
+        console.log('开始切换收藏状态')
         const questionId = currentQuestion.value.id
+        console.log('当前题目ID:', questionId)
+        
         if (!questionId) {
             console.error('无效的题目ID')
             return
         }
         
+        console.log('调用 toggleFavorite API')
         const success = await toggleFavorite(questionId)
+        console.log('API 返回结果:', success)
+        
         if (!success) {
             throw new Error('切换收藏状态失败')
         }
         
+        console.log('重新加载题目列表')
         // 重新加载题目列表以更新收藏状态
         await loadQuestions()
         
@@ -212,11 +206,34 @@ const toggleFavoriteStatus = async () => {
 
 // 打开详情链接
 const openDetail = () => {
-  if (currentQuestion.value.uri) {
+    const uri = currentQuestion.value.uri
+    if (!uri) {
+        uni.showToast({
+            title: '暂无详情链接',
+            icon: 'none'
+        })
+        return
+    }
+    
+    // 简单的 URL 格式检查
+    if (!uri.startsWith('http://') && !uri.startsWith('https://')) {
+        uni.showToast({
+            title: '无效的链接地址',
+            icon: 'none'
+        })
+        return
+    }
+    
     uni.navigateTo({
-      url: `/pages/webview/index?url=${encodeURIComponent(currentQuestion.value.uri)}`
+        url: `/pages/webview/index?url=${encodeURIComponent(uri)}`,
+        fail: (err) => {
+            console.error('打开详情页面失败:', err)
+            uni.showToast({
+                title: '打开详情失败',
+                icon: 'none'
+            })
+        }
     })
-  }
 }
 
 // 通知列表页面刷新
@@ -401,6 +418,12 @@ onMounted(async () => {
 .nav-icon {
     font-size: 40rpx;
     color: #333;
+}
+
+/* 添加收藏图标的特殊样式 */
+.nav-right .nav-icon {
+    color: #FFD700;  /* 金黄色 */
+    text-shadow: 0 0 2rpx rgba(0, 0, 0, 0.1);  /* 添加轻微阴影效果 */
 }
 
 .title {

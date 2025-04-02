@@ -46,6 +46,13 @@
 			"style": {
 				"navigationBarTitleText": "详细解析"
 			}
+		},
+		{
+			"path": "pages/webview/index",
+			"style": {
+				"navigationBarTitleText": "详情页面",
+				"navigationStyle": "custom"
+			}
 		}
 	],
 	"globalStyle": {

@@ -172,13 +172,31 @@ export async function updateLearnStatus(questionId) {
 export async function toggleFavorite(questionId) {
     await openDB()
     try {
+        console.log('开始切换收藏状态，题目ID:', questionId)
+        
+        // 先获取当前收藏状态
+        const checkSql = `SELECT is_favorite FROM question_map WHERE id = ${questionId}`
+        const checkResult = await db.selectTableDataBySql(checkSql)
+        console.log('当前收藏状态:', checkResult[0]?.is_favorite)
+        
+        if (!checkResult || checkResult.length === 0) {
+            console.error('未找到指定题目')
+            return false
+        }
+        
+        const currentStatus = checkResult[0].is_favorite
+        const newStatus = currentStatus === 1 ? 0 : 1
+        
         const sql = `
             UPDATE question_map 
-            SET is_favorite = CASE WHEN is_favorite = 0 THEN 1 ELSE 0 END,
-                favorite_time = CASE WHEN is_favorite = 0 THEN CURRENT_TIMESTAMP ELSE NULL END
+            SET is_favorite = ${newStatus},
+                favorite_time = ${newStatus === 1 ? 'CURRENT_TIMESTAMP' : 'NULL'}
             WHERE id = ${questionId}
         `
+        console.log('执行SQL:', sql)
+        
         await db.executeSql(sql)
+        console.log('收藏状态更新成功')
         return true
     } catch (error) {
         console.error('切换收藏状态失败:', error)
