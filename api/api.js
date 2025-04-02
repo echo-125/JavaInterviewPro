@@ -359,7 +359,8 @@ export async function getQuestionById(questionId) {
         if (result && result.length > 0) {
             return {
                 ...result[0],
-                is_favorite: result[0].is_favorite === 1,
+                is_favorite: Boolean(result[0].is_favorite),
+                is_learned: Boolean(result[0].is_learned),
                 last_study_time: result[0].last_study_time || null
             }
         }

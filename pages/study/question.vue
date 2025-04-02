@@ -20,9 +20,9 @@
         <text class="question-title">{{ currentQuestion.title }}</text>
         <view class="question-meta">
           <view class="study-badge" 
-                :class="{ studied: currentQuestion.last_study_time }"
+                :class="{ studied: currentQuestion.is_learned }"
                 @click="handleStudyBadgeClick">
-            <text class="study-status">{{ currentQuestion.last_study_time ? '已学习' : '未学习' }}</text>
+            <text class="study-status">{{ currentQuestion.is_learned ? '已学习' : '未学习' }}</text>
             <text v-if="currentQuestion.last_study_time" class="study-time">{{ formatDateTime(currentQuestion.last_study_time) }}</text>
           </view>
         </view>
@@ -46,10 +46,10 @@
       <!-- 操作按钮区域 -->
       <view class="action-section">
         <button class="action-btn study-btn" 
-                :class="{ 'study-btn-disabled': currentQuestion.last_study_time }"
-                :disabled="currentQuestion.last_study_time"
+                :class="{ 'study-btn-disabled': currentQuestion.is_learned }"
+                :disabled="currentQuestion.is_learned"
                 @click="toggleStudyStatus">
-          {{ currentQuestion.last_study_time ? '已学习' : '我已学习' }}
+          {{ currentQuestion.is_learned ? '已学习' : '我已学习' }}
         </button>
         <button v-if="currentQuestion.uri" class="action-btn view-detail" @click="openDetail">
           查看详情
@@ -130,7 +130,8 @@ const loadQuestions = async () => {
             questions.value = result.map(question => ({
                 ...question,
                 last_study_time: question.learn_time || null,
-                is_favorite: Boolean(question.is_favorite)
+                is_favorite: Boolean(question.is_favorite),
+                is_learned: Boolean(question.is_learned)
             }))
             
             // 如果是从收藏页面进入，且当前题目不在列表中，添加当前题目
@@ -144,13 +145,30 @@ const loadQuestions = async () => {
                 if (!exists) {
                     const currentQuestion = await getQuestionById(currentQuestionId)
                     if (currentQuestion) {
-                        // 从收藏页面进入时，确保收藏状态为 true
-                        questions.value.push({
+                        // 从收藏页面进入时，确保收藏状态为 true，并保持原有的学习状态
+                        questions.value.unshift({
                             ...currentQuestion,
                             last_study_time: currentQuestion.learn_time || null,
-                            is_favorite: true
+                            is_favorite: true,
+                            is_learned: Boolean(currentQuestion.is_learned)
                         })
                     }
+                } else {
+                    // 如果题目已存在，确保收藏状态为 true，并保持原有的学习状态
+                    const questionIndex = questions.value.findIndex(q => q.id === currentQuestionId)
+                    if (questionIndex !== -1) {
+                        questions.value[questionIndex].is_favorite = true
+                        questions.value[questionIndex].is_learned = Boolean(questions.value[questionIndex].is_learned)
+                    }
+                }
+            }
+            
+            // 设置当前题目索引
+            if (from === 'favorite') {
+                const currentQuestionId = parseInt(questionId.value)
+                const index = questions.value.findIndex(q => q.id === currentQuestionId)
+                if (index !== -1) {
+                    currentIndex.value = index
                 }
             }
         } else {
@@ -278,7 +296,7 @@ const notifyListRefresh = () => {
 
 // 处理学习状态徽章点击
 const handleStudyBadgeClick = async () => {
-    if (currentQuestion.value.last_study_time) {
+    if (currentQuestion.value.is_learned) {
         try {
             const questionId = currentQuestion.value.id
             if (!questionId) return
@@ -290,6 +308,7 @@ const handleStudyBadgeClick = async () => {
             }
             
             // 更新本地数据
+            questions.value[currentIndex.value].is_learned = false
             questions.value[currentIndex.value].last_study_time = null
             
             // 发送刷新通知
@@ -313,11 +332,13 @@ const handleStudyBadgeClick = async () => {
 const toggleStudyStatus = async () => {
     try {
         const questionId = currentQuestion.value.id
-        if (!questionId || currentQuestion.value.last_study_time) return
+        if (!questionId || currentQuestion.value.is_learned) return
         
         // 更新学习状态
         const result = await updateStudyTime(questionId)
         if (result) {
+            // 同时更新学习状态和时间
+            questions.value[currentIndex.value].is_learned = true
             questions.value[currentIndex.value].last_study_time = result.learn_time
             // 发送刷新通知
             notifyListRefresh()
