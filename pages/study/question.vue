@@ -110,81 +110,71 @@ const isFavorite = computed(() => {
 
 // 加载题目列表
 const loadQuestions = async () => {
-  try {
-    isLoading.value = true
-    
-    // 检查数据库是否打开
-    let isOpen = false
     try {
-      isOpen = await db.isOpen()
-      console.log('数据库是否打开:', isOpen)
+        isLoading.value = true
+        
+        // 检查数据库是否打开
+        let isOpen = false
+        try {
+            isOpen = await db.isOpen()
+        } catch (error) {
+            console.error('检查数据库状态失败:', error)
+        }
+        
+        if (!isOpen) {
+            try {
+                await db.openDatabase()
+            } catch (error) {
+                console.error('打开数据库失败:', error)
+                setTimeout(async () => {
+                    await loadQuestions()
+                }, 100)
+                return
+            }
+        }
+        
+        // 获取该分类下的所有题目
+        const result = await getQuestionsWithStatus(categoryId.value)
+        
+        if (result && result.length > 0) {
+            // 确保每个题目都有正确的学习状态
+            questions.value = result.map(question => ({
+                ...question,
+                last_study_time: question.learn_time || null,
+                is_favorite: question.is_favorite === 1
+            }))
+        } else {
+            questions.value = []
+        }
     } catch (error) {
-      console.error('检查数据库状态失败:', error)
+        console.error('加载题目失败:', error)
+    } finally {
+        isLoading.value = false
     }
-    
-    if (!isOpen) {
-      console.log('数据库未打开，尝试打开数据库...')
-      try {
-        await db.openDatabase()
-        console.log('数据库打开成功')
-      } catch (error) {
-        console.error('打开数据库失败:', error)
-        setTimeout(async () => {
-          await loadQuestions()
-        }, 100)
-        return
-      }
-    }
-    
-    // 获取该分类下的所有题目
-    const result = await getQuestionsWithStatus(categoryId.value)
-    console.log('获取到的题目列表:', result)
-    
-    if (result && result.length > 0) {
-      // 确保每个题目都有正确的学习状态
-      questions.value = result.map(question => ({
-        ...question,
-        last_study_time: question.learn_time || null,
-        is_favorite: question.is_favorite === 1
-      }))
-      console.log('处理后的题目列表:', questions.value)
-      console.log('当前题目:', questions.value[currentIndex.value])
-    } else {
-      questions.value = []
-      console.log('未找到题目数据')
-    }
-  } catch (error) {
-    console.error('加载题目失败:', error)
-  } finally {
-    isLoading.value = false
-  }
 }
 
 // 更新学习状态
 const updateStudyTime = async (questionId) => {
-  try {
-    // 确保 questionId 是有效的数字
-    const numericQuestionId = parseInt(questionId)
-    if (isNaN(numericQuestionId)) {
-      console.log('无效的 questionId:', questionId)
-      return null
+    try {
+        // 确保 questionId 是有效的数字
+        const numericQuestionId = parseInt(questionId)
+        if (isNaN(numericQuestionId)) {
+            return null
+        }
+        
+        // 更新学习状态
+        const success = await updateLearnStatus(numericQuestionId)
+        if (!success) {
+            return null
+        }
+        
+        // 获取更新后的题目信息
+        const result = await getQuestionById(numericQuestionId)
+        return result ? { learn_time: result.last_study_time } : null
+    } catch (error) {
+        console.error('更新学习时间失败:', error)
+        return null
     }
-    
-    console.log('更新学习时间，questionId:', numericQuestionId)
-    
-    // 更新学习状态
-    const success = await updateLearnStatus(numericQuestionId)
-    if (!success) {
-      return null
-    }
-    
-    // 获取更新后的题目信息
-    const result = await getQuestionById(numericQuestionId)
-    return result ? { learn_time: result.last_study_time } : null
-  } catch (error) {
-    console.error('更新学习时间失败:', JSON.stringify(error))
-    return null
-  }
 }
 
 // 切换收藏状态
@@ -195,8 +185,6 @@ const toggleFavoriteStatus = async () => {
             console.error('无效的题目ID')
             return
         }
-        
-        console.log('切换收藏状态，当前收藏状态:', isFavorite.value)
         
         const success = await toggleFavorite(questionId)
         if (!success) {
@@ -317,16 +305,13 @@ const nextQuestion = async () => {
 
 // 返回上一页
 const navigateBack = async () => {
-    console.log('准备返回上一页，发送刷新通知')
     // 确保发送数字类型的categoryId
     const numericCategoryId = Number(categoryId.value)
-    console.log('发送的categoryId类型:', typeof numericCategoryId, '值:', numericCategoryId)
     
     // 发送刷新通知
     uni.$emit('questionStatusChanged', {
         categoryId: numericCategoryId
     })
-    console.log('已发送刷新通知，categoryId:', numericCategoryId)
     
     // 等待一段时间确保事件被处理
     await new Promise(resolve => setTimeout(resolve, 300))
@@ -336,55 +321,48 @@ const navigateBack = async () => {
 }
 
 onMounted(async () => {
-  console.log('question页面加载完成')
-  
-  try {
-    // 获取页面参数
-    const pages = getCurrentPages()
-    const currentPage = pages[pages.length - 1]
-    console.log('当前页面参数:', currentPage.$page.options)
-    
-    const { 
-      id,
-      categoryId: categoryIdParam,
-      categoryName: name,
-      index
-    } = currentPage.$page.options
-    
-    console.log('解析后的参数:', { id, categoryIdParam, name, index })
-    
-    if (!id || !name) {
-      console.error('缺少必要的页面参数')
-      uni.showToast({
-        title: '参数错误',
-        icon: 'none'
-      })
-      return
+    try {
+        // 获取页面参数
+        const pages = getCurrentPages()
+        const currentPage = pages[pages.length - 1]
+        
+        const { 
+            id,
+            categoryId: categoryIdParam,
+            categoryName: name,
+            index
+        } = currentPage.$page.options
+        
+        if (!id || !name) {
+            console.error('缺少必要的页面参数')
+            uni.showToast({
+                title: '参数错误',
+                icon: 'none'
+            })
+            return
+        }
+        
+        // 设置参数
+        questionId.value = id
+        categoryId.value = categoryIdParam || id
+        categoryName.value = decodeURIComponent(name)
+        // 设置当前题目索引
+        if (index !== undefined) {
+            currentIndex.value = parseInt(index)
+        }
+        
+        // 确保数据库已初始化
+        await checkAndInitDB()
+        
+        // 加载题目列表
+        await loadQuestions()
+    } catch (error) {
+        console.error('页面初始化失败:', error)
+        uni.showToast({
+            title: '加载失败',
+            icon: 'none'
+        })
     }
-    
-    // 设置参数
-    questionId.value = id
-    categoryId.value = categoryIdParam || id
-    categoryName.value = decodeURIComponent(name)
-    // 设置当前题目索引
-    if (index !== undefined) {
-      currentIndex.value = parseInt(index)
-    }
-    
-    // 确保数据库已初始化
-    await checkAndInitDB()
-    console.log('数据库初始化完成')
-    
-    // 加载题目列表
-    await loadQuestions()
-    console.log('题目列表加载完成')
-  } catch (error) {
-    console.error('页面初始化失败:', error)
-    uni.showToast({
-      title: '加载失败',
-      icon: 'none'
-    })
-  }
 })
 </script>
 

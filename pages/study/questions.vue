@@ -16,7 +16,7 @@
 		<!-- 题目列表 -->
 		<scroll-view scroll-y class="question-list" refresher-enabled :refresher-triggered="isRefreshing"
 			@refresherrefresh="onRefresh" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
-			<view v-for="(question, index) in questions" :key="question.id" class="question-item"
+			<view v-for="question in questions" :key="question.id" class="question-item"
 				@click="navigateToQuestion(question)">
 				<view class="question-info">
 					<text class="question-title">{{ question.sort_order }}. {{ question.title }}</text>
@@ -97,7 +97,6 @@
 		uni.$emit('categoryProgressChanged', {
 			categoryId: categoryId.value
 		})
-		console.log('发送分类进度变更通知，categoryId:', categoryId.value)
 		
 		uni.switchTab({
 			url: '/pages/study/index'
@@ -155,14 +154,12 @@
 		
 		// 监听题目状态变更事件
 		uni.$on('questionStatusChanged', handleQuestionStatusChanged)
-		console.log('已添加题目状态变更事件监听')
 	})
 
 	// 移除页面滚动监听和事件监听
 	onUnmounted(() => {
 		// 移除题目状态变更事件监听
 		uni.$off('questionStatusChanged', handleQuestionStatusChanged)
-		console.log('已移除题目状态变更事件监听')
 	})
 
 	// 处理触摸开始
@@ -199,17 +196,13 @@
 
 	// 处理题目状态变更
 	const handleQuestionStatusChanged = async (data) => {
-		console.log('收到题目状态变更事件:', data)
 		// 确保类型一致进行比较
 		const eventCategoryId = Number(data.categoryId)
-		console.log('事件中的categoryId:', eventCategoryId, '当前页面的categoryId:', categoryId.value)
 		
 		// 只有当变更的题目属于当前分类时才刷新
 		if (eventCategoryId === categoryId.value) {
-			console.log('开始刷新题目列表，当前categoryId:', categoryId.value)
 			try {
 				await loadQuestions()
-				console.log('题目列表刷新完成')
 			} catch (error) {
 				console.error('刷新题目列表失败:', error)
 				uni.showToast({
@@ -217,8 +210,6 @@
 					icon: 'none'
 				})
 			}
-		} else {
-			console.log('忽略其他分类的状态变更')
 		}
 	}
 
@@ -226,40 +217,31 @@
 	const loadQuestions = async () => {
 		try {
 			isLoading.value = true
-			console.log('开始加载题目列表')
 			
 			// 确保数据库已初始化
 			await checkAndInitDB()
-			console.log('数据库初始化检查完成')
 			
 			// 检查question_map表中是否有数据
 			const checkSql = 'SELECT COUNT(*) as count FROM question_map'
 			const checkResult = await db.selectTableDataBySql(checkSql)
-			console.log('数据检查结果:', checkResult[0].count)
 			
 			// 如果没有数据，重新初始化数据库
 			if (checkResult[0].count === 0) {
-				console.log('数据库为空，开始初始化')
 				await initTables()
 				await importCategoryData()
 				await importQuestionMapData()
-				console.log('数据库初始化完成')
 			}
 			
 			// 获取题目列表
-			console.log('开始获取题目列表，categoryId:', categoryId.value)
 			const result = await getQuestionsWithStatus(categoryId.value)
-			console.log('获取到的题目数量:', result?.length || 0)
 			
 			if (result && result.length > 0) {
 				questions.value = result
 				// 计算已完成的题目数量
 				completedCount.value = questions.value.filter(q => q.is_learned).length
-				console.log('已完成的题目数量:', completedCount.value)
 			} else {
 				questions.value = []
 				completedCount.value = 0
-				console.log('未找到题目数据')
 			}
 			
 		} catch (error) {
@@ -268,21 +250,17 @@
 				title: '加载题目失败',
 				icon: 'none'
 			})
-			throw error // 向上抛出错误
+			throw error
 		} finally {
 			isLoading.value = false
 			isRefreshing.value = false
-			console.log('加载题目列表完成')
 		}
 	}
 
 	// 跳转到题目详情
 	const navigateToQuestion = (question) => {
-		console.log('点击题目:', question)
 		const index = questions.value.findIndex(q => q.id === question.id)
-		console.log('题目索引:', index)
 		const url = `/pages/study/question?id=${question.id}&index=${index}&categoryId=${categoryId.value}&categoryName=${encodeURIComponent(categoryName.value)}`
-		console.log('跳转URL:', url)
 		uni.navigateTo({
 			url,
 			fail: (err) => {
