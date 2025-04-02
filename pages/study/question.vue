@@ -31,7 +31,12 @@
       <!-- 答案部分 -->
       <view class="answer-section">
         <view class="answer-header">
-          <text class="answer-title">答案解析</text>
+          <view class="answer-title-wrapper">
+            <text class="answer-title">答案解析</text>
+            <view class="play-btn" @click="togglePlay">
+              <text class="icon-text">{{ isPlaying ? '⏹' : '▶' }}</text>
+            </view>
+          </view>
         </view>
         <view class="answer-content">
           <rich-text class="answer-text" :nodes="currentQuestion.answer || '暂无答案'"></rich-text>
@@ -92,6 +97,7 @@ const currentIndex = ref(0)
 const isLoading = ref(false)
 const isMarking = ref(false)
 const isCancelling = ref(false)
+const isPlaying = ref(false) // 保留状态，后续用于离线语音播放
 
 // 当前题目
 const currentQuestion = computed(() => {
@@ -337,6 +343,14 @@ const navigateBack = async () => {
     uni.navigateBack()
 }
 
+const togglePlay = () => {
+  // 暂时禁用播放功能
+  uni.showToast({
+    title: '语音播放功能开发中',
+    icon: 'none'
+  })
+}
+
 onMounted(async () => {
     try {
         // 获取页面参数
@@ -520,24 +534,41 @@ onMounted(async () => {
 }
 
 .answer-header {
-  padding: 24rpx 30rpx;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  background-color: #f8f9fa;
+  justify-content: space-between;
+  padding: 20rpx 30rpx;
+  background-color: #fff;
   border-bottom: 1rpx solid #eee;
 }
 
-.answer-title {
-  font-size: 28rpx;
-  color: #333;
-  font-weight: bold;
+.answer-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
 }
 
-.answer-icon {
-  font-size: 28rpx;
-  color: #2979ff;
-  margin-left: 10rpx;
+.answer-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.play-btn {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx;
+  border-radius: 50%;
+  background-color: #f5f5f5;
+  transition: all 0.3s ease;
+}
+
+.play-btn:active {
+  background-color: #e0e0e0;
+  transform: scale(0.95);
 }
 
 .answer-content {
@@ -658,5 +689,10 @@ onMounted(async () => {
   align-items: center;
   color: #666;
   font-size: 28rpx;
+}
+
+.icon-text {
+  font-size: 28rpx;
+  color: #666;
 }
 </style> 
