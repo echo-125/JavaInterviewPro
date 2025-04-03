@@ -7,10 +7,11 @@ export default {
 		try {
 			// 显示loading提示
 			uni.showLoading({
-				title: '正在初始化数据库...',
+				title: '初始化数据...',
 				mask: true
 			})
 			
+			// 等待数据库初始化完成
 			await checkAndInitDB()
 			
 			// 隐藏loading提示
@@ -18,14 +19,25 @@ export default {
 			
 			// 数据库初始化完成后，跳转到首页
 			uni.reLaunch({
-				url: '/pages/study/index'
+				url: '/pages/study/index',
+				success: () => {
+					console.log('跳转到首页成功')
+				},
+				fail: (err) => {
+					console.error('跳转到首页失败:', err)
+					uni.showToast({
+						title: '页面跳转失败',
+						icon: 'none'
+					})
+				}
 			})
 		} catch (error) {
 			console.error('数据库初始化失败:', JSON.stringify(error))
 			uni.hideLoading()
 			uni.showToast({
 				title: '数据库初始化失败',
-				icon: 'none'
+				icon: 'none',
+				duration: 2000
 			})
 		}
 	},

@@ -98,8 +98,15 @@
 			categoryId: categoryId.value
 		})
 		
+		// 使用 switchTab 而不是 navigateBack
 		uni.switchTab({
-			url: '/pages/study/index'
+			url: '/pages/study/index',
+			success: () => {
+				// 确保事件被发送后再关闭页面
+				setTimeout(() => {
+					uni.navigateBack()
+				}, 100)
+			}
 		})
 	}
 
@@ -218,31 +225,35 @@
 		try {
 			isLoading.value = true
 			
-			// 确保数据库已初始化
-			await checkAndInitDB()
-			
-			// 检查question_map表中是否有数据
-			const checkSql = 'SELECT COUNT(*) as count FROM question_map'
-			const checkResult = await db.selectTableDataBySql(checkSql)
-			
-			// 如果没有数据，重新初始化数据库
-			if (checkResult[0].count === 0) {
-				await initTables()
-				await importCategoryData()
-				await importQuestionMapData()
-			}
-			
 			// 获取题目列表
-			const result = await getQuestionsWithStatus(categoryId.value)
-			
-			if (result && result.length > 0) {
-				questions.value = result
-				// 计算已完成的题目数量
-				completedCount.value = questions.value.filter(q => q.is_learned).length
-			} else {
-				questions.value = []
-				completedCount.value = 0
+			let result = []
+			try {
+				result = await getQuestionsWithStatus(categoryId.value)
+				
+				// 检查是否有数据
+				if (result.length === 0) {
+					await checkAndInitDB()
+					// 重新查询数据
+					result = await getQuestionsWithStatus(categoryId.value)
+				}
+			} catch (error) {
+				console.error('查询题目数据失败:', error)
+				return
 			}
+			
+			// 处理数据
+			questions.value = result.map((item, index) => ({
+				id: item.id,
+				title: item.title,
+				uri: item.uri,
+				is_favorite: item.is_favorite,
+				is_learned: item.is_learned,
+				last_study_time: item.last_study_time,
+				sort_order: index + 1 // 添加序号
+			}))
+			
+			// 计算已完成的题目数量
+			completedCount.value = questions.value.filter(q => q.is_learned).length
 			
 		} catch (error) {
 			console.error('加载题目失败:', error)
@@ -250,7 +261,6 @@
 				title: '加载题目失败',
 				icon: 'none'
 			})
-			throw error
 		} finally {
 			isLoading.value = false
 			isRefreshing.value = false

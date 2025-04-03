@@ -82,9 +82,6 @@ const loadCategories = async () => {
   try {
     isLoading.value = true
     
-    // 确保数据库已初始化
-    await checkAndInitDB()
-    
     // 获取所有分类
     let result = []
     try {
@@ -92,10 +89,7 @@ const loadCategories = async () => {
       
       // 检查是否有数据
       if (result.length === 0) {
-        await initTables()
-        await importCategoryData()
-        await importQuestionMapData()
-        
+        await checkAndInitDB()
         // 重新查询数据
         result = await getCategories()
       }
@@ -179,12 +173,25 @@ const onShow = () => {
   }
 }
 
-onMounted(() => {
-  // 加载分类列表
-  loadCategories()
-  
-  // 监听分类进度变更事件
-  uni.$on('categoryProgressChanged', handleCategoryProgressChanged)
+onMounted(async () => {
+  try {
+    // 显示加载状态
+    isLoading.value = true
+    
+    // 加载分类列表
+    await loadCategories()
+    
+    // 监听分类进度变更事件
+    uni.$on('categoryProgressChanged', handleCategoryProgressChanged)
+  } catch (error) {
+    console.error('页面加载失败:', error)
+    uni.showToast({
+      title: '加载失败',
+      icon: 'none'
+    })
+  } finally {
+    isLoading.value = false
+  }
 })
 
 // 移除事件监听
@@ -194,8 +201,16 @@ onUnmounted(() => {
 
 // 处理分类进度变更
 const handleCategoryProgressChanged = async (data) => {
-  // 刷新分类列表
-  await loadCategories()
+  try {
+    // 刷新分类列表
+    await loadCategories()
+  } catch (error) {
+    console.error('刷新分类进度失败:', error)
+    uni.showToast({
+      title: '刷新失败',
+      icon: 'none'
+    })
+  }
 }
 
 // 暴露页面生命周期函数
