@@ -1,6 +1,5 @@
 {
-	"pages": [
-		{
+	"pages": [{
 			"path": "pages/study/index",
 			"style": {
 				"navigationBarTitleText": "学习",
@@ -37,18 +36,6 @@
 			}
 		},
 		{
-			"path": "pages/question/detail",
-			"style": {
-				"navigationBarTitleText": "题目详情"
-			}
-		},
-		{
-			"path": "pages/question/webview",
-			"style": {
-				"navigationBarTitleText": "详细解析"
-			}
-		},
-		{
 			"path": "pages/webview/index",
 			"style": {
 				"navigationBarTitleText": "详情页面",
@@ -67,8 +54,7 @@
 		"selectedColor": "#007AFF",
 		"backgroundColor": "#FFFFFF",
 		"borderStyle": "black",
-		"list": [
-			{
+		"list": [{
 				"pagePath": "pages/study/index",
 				"text": "学习",
 				"iconPath": "static/tabbar/study.png",

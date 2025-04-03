@@ -33,8 +33,24 @@
         <view class="answer-header">
           <view class="answer-title-wrapper">
             <text class="answer-title">答案解析</text>
-            <view class="play-btn" @click="togglePlay">
-              <text class="icon-text">{{ isPlaying ? '⏹' : '▶' }}</text>
+            <view class="audio-player">
+              <view class="play-btn" 
+                    :class="{ 'playing': isPlaying }"
+                    @click="togglePlay">
+                <image class="icon-image" 
+                       :src="isPlaying ? '/static/icons/pause.png' : '/static/icons/play.png'" 
+                       mode="aspectFit">
+                </image>
+              </view>
+              <view class="progress-container">
+                <view class="progress-bar">
+                  <view class="progress-inner" :style="{ width: progress + '%' }"></view>
+                </view>
+                <view class="time-info">
+                  <text class="time-text">{{ formatTime(currentTime) }}</text>
+                  <text class="time-text">{{ formatTime(duration) }}</text>
+                </view>
+              </view>
             </view>
           </view>
         </view>
@@ -72,10 +88,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import db from '@/common/database'
 import { checkAndInitDB } from '@/common/dbInit'
 import { formatDateTime } from '@/utils/dateUtil'
+import audioPlayer from '@/utils/audioPlayer'
 import { 
     getQuestionById, 
     updateLearnStatus, 
@@ -92,11 +109,52 @@ const currentIndex = ref(0)
 const isLoading = ref(false)
 const isMarking = ref(false)
 const isCancelling = ref(false)
-const isPlaying = ref(false) // 保留状态，后续用于离线语音播放
+const isPlaying = ref(false)
+
+// 添加进度相关的状态
+const progress = ref(0)
+const currentTime = ref(0)
+const duration = ref(0)
+const progressTimer = ref(null)
+
+// 格式化时间
+const formatTime = (seconds) => {
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = Math.floor(seconds % 60)
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+}
+
+// 更新音频状态
+const updateAudioState = (state) => {
+  isPlaying.value = state.isPlaying
+  progress.value = state.progress
+  currentTime.value = state.currentTime
+  duration.value = state.duration
+}
+
+// 音频路径计算属性
+const audioPath = computed(() => {
+  if (!currentQuestion.value) return ''
+  
+  const currentCategoryId = categoryId.value
+  const sortOrder = currentQuestion.value.sort_order
+  
+  if (!currentCategoryId || !sortOrder) return ''
+  
+  return `/static/audio_file/${currentCategoryId}/${sortOrder}.mp3`
+})
 
 // 当前题目
 const currentQuestion = computed(() => {
-  return questions.value[currentIndex.value] || {}
+  return questions.value[currentIndex.value] || {
+    title: '',
+    answer: '',
+    uri: '',
+    is_favorite: false,
+    is_learned: false,
+    last_study_time: null,
+    sort_order: ''
+  }
 })
 
 // 总题目数
@@ -113,15 +171,10 @@ const isFavorite = computed(() => {
 const loadQuestions = async () => {
     try {
         isLoading.value = true
-        
-        // 确保数据库已初始化
         await checkAndInitDB()
-        
-        // 获取该分类下的所有题目
         const result = await getQuestionsWithStatus(categoryId.value)
         
         if (result && result.length > 0) {
-            // 确保每个题目都有正确的学习状态和收藏状态
             questions.value = result.map(question => ({
                 ...question,
                 last_study_time: question.learn_time || null,
@@ -129,7 +182,6 @@ const loadQuestions = async () => {
                 is_learned: Boolean(question.is_learned)
             }))
             
-            // 如果是从收藏页面进入，且当前题目不在列表中，添加当前题目
             const pages = getCurrentPages()
             const currentPage = pages[pages.length - 1]
             const { from } = currentPage.$page.options
@@ -140,7 +192,6 @@ const loadQuestions = async () => {
                 if (!exists) {
                     const currentQuestion = await getQuestionById(currentQuestionId)
                     if (currentQuestion) {
-                        // 从收藏页面进入时，确保收藏状态为 true，并保持原有的学习状态
                         questions.value.unshift({
                             ...currentQuestion,
                             last_study_time: currentQuestion.learn_time || null,
@@ -149,7 +200,6 @@ const loadQuestions = async () => {
                         })
                     }
                 } else {
-                    // 如果题目已存在，确保收藏状态为 true，并保持原有的学习状态
                     const questionIndex = questions.value.findIndex(q => q.id === currentQuestionId)
                     if (questionIndex !== -1) {
                         questions.value[questionIndex].is_favorite = true
@@ -158,7 +208,6 @@ const loadQuestions = async () => {
                 }
             }
             
-            // 设置当前题目索引
             if (from === 'favorite') {
                 const currentQuestionId = parseInt(questionId.value)
                 const index = questions.value.findIndex(q => q.id === currentQuestionId)
@@ -183,22 +232,14 @@ const loadQuestions = async () => {
 // 更新学习状态
 const updateStudyTime = async (questionId) => {
     try {
-        // 确保 questionId 是有效的数字
         const numericQuestionId = parseInt(questionId)
-        if (isNaN(numericQuestionId)) {
-            return null
-        }
+        if (isNaN(numericQuestionId)) return null
         
-        // 更新学习状态
         const success = await updateLearnStatus(numericQuestionId)
-        if (!success) {
-            return null
-        }
+        if (!success) return null
         
-        // 获取更新后的题目信息
         const result = await getQuestionById(numericQuestionId)
         if (result) {
-            // 更新本地数据
             const currentTime = new Date().getTime()
             questions.value[currentIndex.value].last_study_time = currentTime
             return { learn_time: currentTime }
@@ -213,28 +254,14 @@ const updateStudyTime = async (questionId) => {
 // 切换收藏状态
 const toggleFavoriteStatus = async () => {
     try {
-        console.log('开始切换收藏状态')
         const questionId = currentQuestion.value.id
-        console.log('当前题目ID:', questionId)
+        if (!questionId) return
         
-        if (!questionId) {
-            console.error('无效的题目ID')
-            return
-        }
-        
-        console.log('调用 toggleFavorite API')
         const success = await toggleFavorite(questionId)
-        console.log('API 返回结果:', success)
+        if (!success) throw new Error('切换收藏状态失败')
         
-        if (!success) {
-            throw new Error('切换收藏状态失败')
-        }
-        
-        // 直接更新当前题目的收藏状态，而不是重新加载
         const newIsFavorite = !currentQuestion.value.is_favorite
         questions.value[currentIndex.value].is_favorite = newIsFavorite
-        
-        // 发送刷新通知
         notifyListRefresh()
         
         uni.showToast({
@@ -261,7 +288,6 @@ const openDetail = () => {
         return
     }
     
-    // 简单的 URL 格式检查
     if (!uri.startsWith('http://') && !uri.startsWith('https://')) {
         uni.showToast({
             title: '无效的链接地址',
@@ -296,17 +322,11 @@ const handleStudyBadgeClick = async () => {
             const questionId = currentQuestion.value.id
             if (!questionId) return
             
-            // 取消已学习状态
             const success = await cancelLearnStatus(questionId)
-            if (!success) {
-                throw new Error('取消学习状态失败')
-            }
+            if (!success) throw new Error('取消学习状态失败')
             
-            // 更新本地数据
             questions.value[currentIndex.value].is_learned = false
             questions.value[currentIndex.value].last_study_time = null
-            
-            // 发送刷新通知
             notifyListRefresh()
             
             uni.showToast({
@@ -329,13 +349,10 @@ const toggleStudyStatus = async () => {
         const questionId = currentQuestion.value.id
         if (!questionId || currentQuestion.value.is_learned) return
         
-        // 更新学习状态
         const result = await updateStudyTime(questionId)
         if (result) {
-            // 同时更新学习状态和时间
             questions.value[currentIndex.value].is_learned = true
             questions.value[currentIndex.value].last_study_time = result.learn_time
-            // 发送刷新通知
             notifyListRefresh()
             uni.showToast({
                 title: '已标记为学习',
@@ -354,8 +371,8 @@ const toggleStudyStatus = async () => {
 // 上一题
 const prevQuestion = async () => {
   if (currentIndex.value > 0) {
+    audioPlayer.stop()
     currentIndex.value--
-    // 更新学习状态标记
     isMarking.value = !!questions.value[currentIndex.value].last_study_time
   }
 }
@@ -363,40 +380,35 @@ const prevQuestion = async () => {
 // 下一题
 const nextQuestion = async () => {
   if (currentIndex.value < totalQuestions.value - 1) {
+    audioPlayer.stop()
     currentIndex.value++
-    // 更新学习状态标记
     isMarking.value = !!questions.value[currentIndex.value].last_study_time
   }
 }
 
 // 返回上一页
 const navigateBack = async () => {
-    // 确保发送数字类型的categoryId
     const numericCategoryId = Number(categoryId.value)
-    
-    // 发送刷新通知
-    uni.$emit('questionStatusChanged', {
-        categoryId: numericCategoryId
-    })
-    
-    // 等待一段时间确保事件被处理
+    notifyListRefresh()
     await new Promise(resolve => setTimeout(resolve, 300))
-    
-    // 返回上一页
     uni.navigateBack()
 }
 
+// 切换播放状态
 const togglePlay = () => {
-  // 暂时禁用播放功能
-  uni.showToast({
-    title: '语音播放功能开发中',
-    icon: 'none'
-  })
+    audioPlayer.togglePlay(audioPath.value)
 }
+
+// 页面显示时
+defineExpose({
+  onShow() {
+    audioPlayer.init()
+    audioPlayer.setStateChangeCallback(updateAudioState)
+  }
+})
 
 onMounted(async () => {
     try {
-        // 获取页面参数
         const pages = getCurrentPages()
         const currentPage = pages[pages.length - 1]
         
@@ -416,26 +428,34 @@ onMounted(async () => {
             return
         }
         
-        // 设置参数
         questionId.value = id
         categoryId.value = categoryIdParam || id
         categoryName.value = decodeURIComponent(name)
-        // 设置当前题目索引
         if (index !== undefined) {
             currentIndex.value = parseInt(index)
         }
         
-        // 确保数据库已初始化
         await checkAndInitDB()
-        
-        // 加载题目列表
         await loadQuestions()
+        audioPlayer.init()
+        audioPlayer.setStateChangeCallback(updateAudioState)
     } catch (error) {
         console.error('页面初始化失败:', error)
         uni.showToast({
             title: '加载失败',
             icon: 'none'
         })
+    }
+})
+
+onUnmounted(() => {
+    audioPlayer.destroy()
+})
+
+// 监听题目切换，停止当前播放
+watch(() => currentQuestion.value?.id, (newId, oldId) => {
+    if (newId !== oldId) {
+        audioPlayer.stop()
     }
 })
 </script>
@@ -588,30 +608,82 @@ onMounted(async () => {
 .answer-title-wrapper {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 8rpx;
+  flex: 1;
 }
 
 .answer-title {
   font-size: 32rpx;
   font-weight: bold;
   color: #333;
+  white-space: nowrap;
+}
+
+.audio-player {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  background-color: #f8f9fa;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  flex: 1;
+  margin-left: 8rpx;
 }
 
 .play-btn {
-  width: 48rpx;
-  height: 48rpx;
+  width: 80rpx;
+  height: 80rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8rpx;
   border-radius: 50%;
-  background-color: #f5f5f5;
-  transition: all 0.3s ease;
+  background-color: transparent;
+  transition: all 0.2s ease;
 }
 
-.play-btn:active {
-  background-color: #e0e0e0;
-  transform: scale(0.95);
+.play-btn.playing {
+  background-color: transparent;
+}
+
+.icon-image {
+  width: 60rpx;
+  height: 60rpx;
+}
+
+.progress-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+}
+
+.progress-bar {
+  position: relative;
+  height: 2rpx;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 1rpx;
+  overflow: hidden;
+}
+
+.progress-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background-color: #007AFF;
+  transition: width 0.1s linear;
+}
+
+.time-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2rpx;
+}
+
+.time-text {
+  font-size: 20rpx;
+  color: #999;
 }
 
 .answer-content {
