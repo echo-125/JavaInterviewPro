@@ -10,7 +10,7 @@
         <text class="subtitle">{{ currentIndex + 1 }}/{{ totalQuestions }}</text>
       </view>
       <view class="nav-right">
-        <text class="nav-icon" @click="toggleFavoriteStatus">{{ isFavorite ? '★' : '☆' }}</text>
+        <text class="favorite-icon" @click="toggleFavoriteStatus">{{ isFavorite ? '★' : '☆' }}</text>
       </view>
     </view>
 
@@ -40,32 +40,27 @@
         </view>
         <view class="answer-content">
           <rich-text class="answer-text" :nodes="currentQuestion.answer || '暂无答案'"></rich-text>
+          <view v-if="currentQuestion.uri" class="detail-link" @click="openDetail">
+            <text class="link-text">查看详情</text>
+          </view>
         </view>
-      </view>
-
-      <!-- 操作按钮区域 -->
-      <view class="action-section">
-        <button class="action-btn study-btn" 
-                :class="{ 'study-btn-disabled': currentQuestion.is_learned }"
-                :disabled="currentQuestion.is_learned"
-                @click="toggleStudyStatus">
-          {{ currentQuestion.is_learned ? '已学习' : '我已学习' }}
-        </button>
-        <button v-if="currentQuestion.uri" class="action-btn view-detail" @click="openDetail">
-          查看详情
-        </button>
       </view>
     </scroll-view>
 
     <!-- 底部导航栏 -->
     <view class="bottom-bar">
-      <view class="nav-btn prev" @click="prevQuestion" :class="{ disabled: currentIndex === 0 }">
-        <text class="btn-icon">←</text>
-        <text class="btn-text">上一题</text>
-      </view>
-      <view class="nav-btn next" @click="nextQuestion" :class="{ disabled: currentIndex === totalQuestions - 1 }">
-        <text class="btn-text">下一题</text>
-        <text class="btn-icon">→</text>
+      <view class="nav-buttons">
+        <view class="nav-btn study" 
+              :class="{ 'study-btn-disabled': currentQuestion.is_learned }"
+              @click="toggleStudyStatus">
+          <text class="btn-text">{{ currentQuestion.is_learned ? '已学习' : '记住了' }}</text>
+        </view>
+        <view class="nav-btn prev" @click="prevQuestion" :class="{ disabled: currentIndex === 0 }">
+          <text class="btn-text">上一题</text>
+        </view>
+        <view class="nav-btn next" @click="nextQuestion" :class="{ disabled: currentIndex === totalQuestions - 1 }">
+          <text class="btn-text">下一题</text>
+        </view>
       </view>
     </view>
 
@@ -683,35 +678,61 @@ onMounted(async () => {
 }
 
 .bottom-bar {
-  background-color: #fff;
-  padding: 20rpx;
+  background-color: #f8f8f8;
+  padding: 12rpx 24rpx;
   display: flex;
-  justify-content: space-between;
-  border-top: 1rpx solid #eee;
+  align-items: center;
+  border-top: 1rpx solid #e0e0e0;
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 100;
-  height: 120rpx;
+  height: 100rpx;
   box-sizing: border-box;
 }
 
+.nav-buttons {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 24rpx;
+}
+
 .nav-btn {
+  flex: 1;
   display: flex;
   align-items: center;
-  padding: 16rpx 32rpx;
-  border-radius: 8rpx;
-  background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
-  transition: all 0.3s;
-  min-width: 200rpx;
   justify-content: center;
-  margin: 0 10rpx;
+  height: 76rpx;
+  border-radius: 8rpx;
+  background-color: #fff;
+  border: 1rpx solid #ddd;
+  transition: all 0.2s;
+  min-width: 0;
+}
+
+.nav-btn.study {
+  border-color: #007AFF;
+}
+
+.nav-btn .btn-text {
+  font-size: 32rpx;
+  color: #666;
+  font-weight: 400;
+}
+
+.nav-btn.study .btn-text {
+  color: #007AFF;
+  font-weight: 400;
 }
 
 .nav-btn:active {
-  background: linear-gradient(135deg, #e0e0e0, #bdbdbd);
-  transform: translateY(2rpx);
+  background-color: #f5f5f5;
+}
+
+.nav-btn.study:active {
+  background-color: rgba(0, 122, 255, 0.1);
 }
 
 .nav-btn.disabled {
@@ -719,10 +740,39 @@ onMounted(async () => {
   pointer-events: none;
 }
 
-.btn-text {
+.nav-btn.study.study-btn-disabled {
+  background-color: #f5f5f5;
+  border-color: #ddd;
+  opacity: 1;
+}
+
+.nav-btn.study.study-btn-disabled .btn-text {
+  color: #999;
+}
+
+/* 修改详情链接样式 */
+.detail-link {
+  margin-top: 20rpx;
+  text-align: right;
+}
+
+.link-text {
   font-size: 28rpx;
-  color: #666;
-  font-weight: bold;
+  color: #007AFF;
+  display: inline-block;
+  padding: 10rpx 0;
+}
+
+/* 修改收藏图标样式 */
+.favorite-icon {
+  font-size: 56rpx;
+  color: #FFD700;
+  text-shadow: 0 0 2rpx rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.favorite-icon:active {
+  transform: scale(0.95);
 }
 
 .loading {
