@@ -65,6 +65,7 @@ import db from '@/common/database'
 import { getUserStats } from '@/api/api.js'
 import { getTheme, setTheme, getThemeVariables } from '@/utils/theme'
 import useTheme from '@/mixins/themeMixin'
+import CacheUtil from '@/utils/cacheUtil'
 
 const userInfo = ref({
   username: '',
@@ -117,17 +118,35 @@ const toggleDarkMode = async (e) => {
 }
 
 // 清除缓存
-const clearCache = () => {
+const clearCache = async () => {
   uni.showModal({
     title: '提示',
     content: '确定要清除缓存吗？',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        // TODO: 实现清除缓存逻辑
-        uni.showToast({
-          title: '清除成功',
-          icon: 'success'
-        })
+        try {
+          // 显示加载提示
+          uni.showLoading({
+            title: '正在清理...',
+            mask: true
+          })
+
+          // 使用工具类清除缓存
+          await CacheUtil.clearCache()
+          
+          uni.hideLoading()
+          uni.showToast({
+            title: '清除成功',
+            icon: 'success'
+          })
+        } catch (error) {
+          console.error('清除缓存失败:', error)
+          uni.hideLoading()
+          uni.showToast({
+            title: '清除失败',
+            icon: 'error'
+          })
+        }
       }
     }
   })
