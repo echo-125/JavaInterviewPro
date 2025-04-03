@@ -135,11 +135,17 @@ onMounted(() => {
   loadFavorites()
   // 添加事件监听
   uni.$on('questionStatusChanged', handleQuestionStatusChanged)
+  // 监听数据重置事件
+  uni.$on('dataReset', () => {
+    loadFavorites()
+  })
 })
 
 // 页面卸载时移除事件监听
 onUnmounted(() => {
   uni.$off('questionStatusChanged', handleQuestionStatusChanged)
+  // 移除事件监听
+  uni.$off('dataReset')
 })
 
 // 定义页面生命周期函数

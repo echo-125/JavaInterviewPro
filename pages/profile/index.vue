@@ -66,6 +66,7 @@ import { getUserStats } from '@/api/api.js'
 import { getTheme, setTheme, getThemeVariables } from '@/utils/theme'
 import useTheme from '@/mixins/themeMixin'
 import CacheUtil from '@/utils/cacheUtil'
+import { resetDatabase } from '@/common/dbInit'
 
 const userInfo = ref({
   username: '',
@@ -157,13 +158,37 @@ const resetData = () => {
   uni.showModal({
     title: '警告',
     content: '确定要重置所有数据吗？此操作不可恢复！',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        // TODO: 实现重置数据逻辑
-        uni.showToast({
-          title: '重置成功',
-          icon: 'success'
-        })
+        try {
+          // 显示加载提示
+          uni.showLoading({
+            title: '正在重置数据...',
+            mask: true
+          })
+
+          // 重置数据库
+          await resetDatabase()
+          
+          // 重新加载用户信息
+          await loadUserInfo()
+          
+          // 发送刷新事件
+          uni.$emit('dataReset')
+          
+          uni.hideLoading()
+          uni.showToast({
+            title: '重置成功',
+            icon: 'success'
+          })
+        } catch (error) {
+          console.error('重置数据失败:', error)
+          uni.hideLoading()
+          uni.showToast({
+            title: '重置失败',
+            icon: 'error'
+          })
+        }
       }
     }
   })

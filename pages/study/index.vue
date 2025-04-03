@@ -260,6 +260,10 @@ onMounted(async () => {
     
     // 监听分类进度变更事件
     uni.$on('categoryProgressChanged', handleCategoryProgressChanged)
+    // 监听数据重置事件
+    uni.$on('dataReset', async () => {
+      await loadCategories()
+    })
   } catch (error) {
     console.error('页面加载失败:', error)
     uni.showToast({
@@ -274,6 +278,7 @@ onMounted(async () => {
 // 移除事件监听
 onUnmounted(() => {
   uni.$off('categoryProgressChanged', handleCategoryProgressChanged)
+  uni.$off('dataReset')
 })
 
 // 处理分类进度变更

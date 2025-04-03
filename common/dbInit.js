@@ -172,6 +172,33 @@ async function checkAndInitDB() {
     }
 }
 
+/**
+ * 重置数据库
+ * 1. 删除所有表
+ * 2. 重新创建表
+ * 3. 重新导入数据
+ */
+async function resetDatabase() {
+    try {
+        // 确保数据库已打开
+        if (!db.isOpen()) {
+            await db.open()
+        }
+
+        // 重新初始化表
+        await initTables()
+
+        // 重新导入数据
+        await importCategoryData()
+        await importQuestionMapData()
+
+        return true
+    } catch (error) {
+        console.error('重置数据库失败:', error)
+        throw error
+    }
+}
+
 // 在应用启动时初始化数据库
 // #ifdef APP-PLUS
 plus.globalEvent.addEventListener('plusready', () => {
@@ -183,5 +210,6 @@ export {
     checkAndInitDB,
     initTables,
     importCategoryData,
-    importQuestionMapData
+    importQuestionMapData,
+    resetDatabase
 } 
