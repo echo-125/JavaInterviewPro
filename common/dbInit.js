@@ -26,12 +26,9 @@ async function checkTableExists(tableName) {
  */
 async function initTables() {
     try {
-        console.log('开始创建表...')
-        
         // 删除已存在的表（如果存在）
         await db.executeSql('DROP TABLE IF EXISTS question_map')
         await db.executeSql('DROP TABLE IF EXISTS category')
-        console.log('清理旧表成功')
         
         // 创建分类表
         await db.executeSql(`
@@ -49,12 +46,12 @@ async function initTables() {
                 uri VARCHAR(255) NOT NULL,
                 title VARCHAR(255),
                 category_id INTEGER,
-                sort_order INTEGER,    -- 排序字段
-                answer TEXT,           -- 题目答案
-                is_favorite BOOLEAN DEFAULT 0,  -- 是否收藏
-                favorite_time TIMESTAMP,        -- 收藏时间
-                is_learned BOOLEAN DEFAULT 0,   -- 是否学习
-                learn_time TIMESTAMP,           -- 学习时间
+                sort_order INTEGER,
+                answer TEXT,
+                is_favorite BOOLEAN DEFAULT 0,
+                favorite_time TIMESTAMP,
+                is_learned BOOLEAN DEFAULT 0,
+                learn_time TIMESTAMP,
                 create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (category_id) REFERENCES category(id)
             )
@@ -64,10 +61,8 @@ async function initTables() {
         await db.executeSql('CREATE INDEX idx_question_category ON question_map(category_id)')
         await db.executeSql('CREATE INDEX idx_question_uri ON question_map(uri)')
         await db.executeSql('CREATE INDEX idx_question_sort ON question_map(category_id, sort_order)')
-
-        console.log('数据库表创建成功')
     } catch (error) {
-        console.error('创建数据库表失败:', JSON.stringify(error))
+        console.error('创建数据库表失败:', error)
         throw error
     }
 }
@@ -77,7 +72,6 @@ async function initTables() {
  */
 async function importCategoryData() {
     try {
-        // 导入新数据
         for (const category of categoryData) {
             const sql = `
                 INSERT INTO category (id, name, create_time)
@@ -85,8 +79,6 @@ async function importCategoryData() {
             `
             await db.executeSql(sql)
         }
-        
-        console.log('分类数据导入成功')
     } catch (error) {
         console.error('导入分类数据失败:', error)
         throw error
@@ -98,10 +90,8 @@ async function importCategoryData() {
  */
 async function importQuestionMapData() {
     try {
-        // 清空现有数据
         await db.executeSql('DELETE FROM question_map')
 
-        // 导入新数据
         for (const question of questionMapData) {
             const sql = `
                 INSERT INTO question_map (
@@ -124,8 +114,6 @@ async function importQuestionMapData() {
             `
             await db.executeSql(sql)
         }
-
-        console.log('题目数据导入成功')
     } catch (error) {
         console.error('导入题目数据失败:', error)
         throw error
@@ -137,85 +125,39 @@ async function importQuestionMapData() {
  */
 async function checkAndInitDB() {
     try {
-        // 如果已经初始化完成，直接返回
-        if (isInitialized) {
-            console.log('数据库已初始化完成')
-            return
-        }
+        if (isInitialized) return
         
-        // 如果正在初始化，等待初始化完成
         if (isInitializing) {
-            console.log('数据库正在初始化中，请等待...')
-            // 等待一段时间后重试
             await new Promise(resolve => setTimeout(resolve, 100))
             return checkAndInitDB()
         }
         
-        console.log('开始检查数据库初始化...')
-        
-        // 设置初始化状态
         isInitializing = true
         
         try {
-            // 确保数据库已打开
             if (!db.isOpen()) {
-                console.log('数据库未打开，正在打开...')
                 await db.open()
-                console.log('数据库打开成功')
             }
 
-            // 检查表是否存在
-            console.log('检查表是否存在...')
             const categoryExists = await checkTableExists('category')
             const questionMapExists = await checkTableExists('question_map')
-            
-            console.log('表检查结果:', {
-                category: categoryExists,
-                questionMap: questionMapExists
-            })
 
-            // 如果任何表不存在，重新初始化
             if (!categoryExists || !questionMapExists) {
-                console.log('检测到表不存在，开始初始化...')
                 await initTables()
-                console.log('表初始化完成')
-                
-                // 导入数据
-                console.log('开始导入数据...')
                 await importCategoryData()
-                console.log('分类数据导入完成')
-                
                 await importQuestionMapData()
-                console.log('题目数据导入完成')
-                
-                console.log('所有数据导入完成')
             } else {
-                console.log('所有表已存在，无需初始化')
-                
-                // 检查是否有数据
                 const categoryCount = await db.selectTableDataBySql('SELECT COUNT(*) as count FROM category')
                 const questionCount = await db.selectTableDataBySql('SELECT COUNT(*) as count FROM question_map')
                 
-                console.log('数据检查结果:', {
-                    categoryCount: categoryCount[0].count,
-                    questionCount: questionCount[0].count
-                })
-                
-                // 如果没有数据，重新导入
                 if (categoryCount[0].count === 0 || questionCount[0].count === 0) {
-                    console.log('检测到数据为空，开始导入数据...')
                     await importCategoryData()
                     await importQuestionMapData()
-                    console.log('数据导入完成')
                 }
             }
             
-            console.log('数据库初始化检查完成')
-            // 设置初始化完成标志
             isInitialized = true
         } catch (error) {
-            console.error('数据库操作失败:', error)
-            // 如果数据库未打开，尝试重新打开
             if (error.message.includes('Not Open')) {
                 await db.open()
                 return checkAndInitDB()
@@ -223,10 +165,9 @@ async function checkAndInitDB() {
             throw error
         }
     } catch (error) {
-        console.error('数据库初始化失败:', JSON.stringify(error))
+        console.error('数据库初始化失败:', error)
         throw error
     } finally {
-        // 重置初始化状态
         isInitializing = false
     }
 }
@@ -234,7 +175,6 @@ async function checkAndInitDB() {
 // 在应用启动时初始化数据库
 // #ifdef APP-PLUS
 plus.globalEvent.addEventListener('plusready', () => {
-    console.log('plusready 事件触发，初始化数据库')
     checkAndInitDB()
 })
 // #endif

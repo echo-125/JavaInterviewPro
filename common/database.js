@@ -7,6 +7,7 @@ const dbConfig = {
 class Database {
 	constructor() {
 		this.db = null
+		this.isOpening = false
 	}
 
 	/**
@@ -14,28 +15,33 @@ class Database {
 	 */
 	async open() {
 		try {
-			if (this.db) {
+			if (this.isOpening) {
+				await new Promise(resolve => setTimeout(resolve, 100))
+				return this.open()
+			}
+
+			if (this.isOpen()) {
 				return this.db
 			}
 
+			this.isOpening = true
 			this.db = await new Promise((resolve, reject) => {
 				plus.sqlite.openDatabase({
 					name: dbConfig.dbName,
 					path: dbConfig.dbPath,
-					success: (e) => {
-						console.log('数据库打开成功:', e)
-						resolve(e)
-					},
-					fail: (e) => {
-						console.error('数据库打开失败:', e)
-						reject(e)
-					}
+					success: resolve,
+					fail: reject
 				})
 			})
 			return this.db
 		} catch (error) {
-			console.error('打开数据库失败:', error)
+			if (error.code === -1402) {
+				// 数据库已经打开，返回现有连接
+				return this.db
+			}
 			throw error
+		} finally {
+			this.isOpening = false
 		}
 	}
 
@@ -44,7 +50,7 @@ class Database {
 	 */
 	async close() {
 		try {
-			if (this.db) {
+			if (this.db && this.isOpen()) {
 				await new Promise((resolve, reject) => {
 					plus.sqlite.closeDatabase({
 						name: dbConfig.dbName,
@@ -55,7 +61,10 @@ class Database {
 				this.db = null
 			}
 		} catch (error) {
-			console.error('关闭数据库失败:', error)
+			if (error.code === -1401) {
+				// 数据库未打开，忽略错误
+				return
+			}
 			throw error
 		}
 	}
@@ -64,10 +73,14 @@ class Database {
 	 * 检查数据库是否打开
 	 */
 	isOpen() {
-		return plus.sqlite.isOpenDatabase({
-			name: dbConfig.dbName,
-			path: dbConfig.dbPath
-		})
+		try {
+			return plus.sqlite.isOpenDatabase({
+				name: dbConfig.dbName,
+				path: dbConfig.dbPath
+			})
+		} catch (error) {
+			return false
+		}
 	}
 
 	/**
@@ -75,32 +88,22 @@ class Database {
 	 */
 	async executeSql(sql, params = []) {
 		try {
-			// 确保数据库已打开
 			if (!this.isOpen()) {
 				await this.open()
 			}
 
-			console.log('执行SQL:', sql, '参数:', params)
 			const result = await new Promise((resolve, reject) => {
 				plus.sqlite.executeSql({
 					name: dbConfig.dbName,
 					sql: sql,
 					values: params,
-					success: (e) => {
-						console.log('SQL执行成功:', e)
-						resolve(e)
-					},
-					fail: (e) => {
-						console.error('SQL执行失败:', e)
-						reject(e)
-					}
+					success: resolve,
+					fail: reject
 				})
 			})
 			return result
 		} catch (error) {
-			console.error('SQL执行失败:', error)
-			// 如果是数据库未打开的错误，尝试重新打开
-			if (error.message.includes('Not Open')) {
+			if (error.code === -1401) {
 				await this.open()
 				return this.executeSql(sql, params)
 			}
@@ -113,12 +116,10 @@ class Database {
 	 */
 	async selectTableDataBySql(sql, params = []) {
 		try {
-			// 确保数据库已打开
 			if (!this.isOpen()) {
 				await this.open()
 			}
 
-			console.log('执行查询:', sql, '参数:', params)
 			const result = await new Promise((resolve, reject) => {
 				plus.sqlite.selectSql({
 					name: dbConfig.dbName,
@@ -130,9 +131,7 @@ class Database {
 			})
 			return result
 		} catch (error) {
-			console.error('查询失败:', error)
-			// 如果是数据库未打开的错误，尝试重新打开
-			if (error.message.includes('Not Open')) {
+			if (error.code === -1401) {
 				await this.open()
 				return this.selectTableDataBySql(sql, params)
 			}
@@ -145,15 +144,11 @@ class Database {
 	 */
 	async QueryTables() {
 		try {
-			// 确保数据库已打开
 			if (!this.isOpen()) {
 				await this.open()
 			}
-
-			const result = await this.selectTableDataBySql("SELECT name FROM sqlite_master WHERE type='table'")
-			return result
+			return await this.selectTableDataBySql("SELECT name FROM sqlite_master WHERE type='table'")
 		} catch (error) {
-			console.error('查询数据库表失败:', error)
 			throw error
 		}
 	}

@@ -354,10 +354,14 @@ const toggleStudyStatus = async () => {
             questions.value[currentIndex.value].is_learned = true
             questions.value[currentIndex.value].last_study_time = result.learn_time
             notifyListRefresh()
-            uni.showToast({
-                title: '已标记为学习',
-                icon: 'success'
-            })
+            
+            // 延迟显示提示，确保状态更新完成
+            setTimeout(() => {
+                uni.showToast({
+                    title: '已标记为学习',
+                    icon: 'success'
+                })
+            }, 100)
         }
     } catch (error) {
         console.error('更新学习状态失败:', error)
@@ -388,10 +392,37 @@ const nextQuestion = async () => {
 
 // 返回上一页
 const navigateBack = async () => {
-    const numericCategoryId = Number(categoryId.value)
-    notifyListRefresh()
-    await new Promise(resolve => setTimeout(resolve, 300))
-    uni.navigateBack()
+    try {
+        const numericCategoryId = Number(categoryId.value)
+        notifyListRefresh()
+        
+        // 确保状态更新完成后再返回
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
+        // 使用 switchTab 而不是 navigateBack
+        uni.switchTab({
+            url: '/pages/study/index',
+            success: () => {
+                // 延迟关闭当前页面，确保事件发送完成
+                setTimeout(() => {
+                    uni.navigateBack()
+                }, 100)
+            },
+            fail: (err) => {
+                console.error('页面跳转失败:', err)
+                uni.showToast({
+                    title: '返回失败',
+                    icon: 'none'
+                })
+            }
+        })
+    } catch (error) {
+        console.error('返回失败:', error)
+        uni.showToast({
+            title: '返回失败',
+            icon: 'none'
+        })
+    }
 }
 
 // 切换播放状态

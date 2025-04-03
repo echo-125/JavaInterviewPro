@@ -3,26 +3,17 @@ import { checkAndInitDB } from '@/common/dbInit.js'
 
 export default {
 	onLaunch: async function() {
-		console.log('App Launch')
 		try {
-			// 显示loading提示
 			uni.showLoading({
 				title: '初始化数据...',
 				mask: true
 			})
 			
-			// 等待数据库初始化完成
 			await checkAndInitDB()
-			
-			// 隐藏loading提示
 			uni.hideLoading()
 			
-			// 数据库初始化完成后，跳转到首页
 			uni.reLaunch({
 				url: '/pages/study/index',
-				success: () => {
-					console.log('跳转到首页成功')
-				},
 				fail: (err) => {
 					console.error('跳转到首页失败:', err)
 					uni.showToast({
@@ -32,7 +23,7 @@ export default {
 				}
 			})
 		} catch (error) {
-			console.error('数据库初始化失败:', JSON.stringify(error))
+			console.error('数据库初始化失败:', error)
 			uni.hideLoading()
 			uni.showToast({
 				title: '数据库初始化失败',
@@ -42,10 +33,10 @@ export default {
 		}
 	},
 	onShow: function() {
-		console.log('App Show')
+		// 可以在这里添加应用显示时的逻辑
 	},
 	onHide: function() {
-		console.log('App Hide')
+		// 可以在这里添加应用隐藏时的逻辑
 	}
 }
 </script>
