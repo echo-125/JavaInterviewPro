@@ -302,15 +302,20 @@
 		top: var(--status-bar-height);
 		z-index: 100;
 		transition: all 0.3s ease;
+		margin-bottom: 20rpx;
 	}
 
 	.header-left {
 		width: 100rpx;
+		position: absolute;
+		left: 30rpx;
 	}
 
 	.header-center {
 		flex: 1;
 		text-align: center;
+		position: relative;
+		z-index: 1;
 	}
 
 	.back-btn {
@@ -344,7 +349,7 @@
 
 	.question-list {
 		height: calc(100vh - 200rpx);
-		padding: 0 20rpx;
+		padding: 20rpx 20rpx 0;
 		box-sizing: border-box;
 	}
 
