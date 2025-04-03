@@ -42,6 +42,12 @@
 				"navigationBarTitleText": "详情页面",
 				"navigationStyle": "custom"
 			}
+		},
+		{
+			"path": "pages/profile/import",
+			"style": {
+				"navigationBarTitleText": "导入题库"
+			}
 		}
 	],
 	"globalStyle": {

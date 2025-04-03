@@ -196,18 +196,8 @@ const resetData = () => {
 
 // 导入题库
 const importQuestions = () => {
-  uni.showModal({
-    title: '提示',
-    content: '确定要导入题库吗？这将覆盖现有数据。',
-    success: (res) => {
-      if (res.confirm) {
-        // TODO: 实现导入题库逻辑
-        uni.showToast({
-          title: '导入成功',
-          icon: 'success'
-        })
-      }
-    }
+  uni.navigateTo({
+    url: '/pages/profile/import'
   })
 }
 
@@ -224,7 +214,7 @@ onMounted(() => {
 
 // 页面卸载时移除事件监听
 onUnmounted(() => {
-  uni.$off('themeChanged', handleThemeChange)
+  // 移除不需要的事件监听
 })
 </script>
 
