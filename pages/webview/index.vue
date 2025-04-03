@@ -1,8 +1,8 @@
 <template>
-  <view class="container">
+  <view class="container" :style="themeStyle">
     <!-- 顶部导航栏 -->
-    <view class="nav-bar">
-      <text class="title">详情页面</text>
+    <view class="nav-bar" :style="headerStyle">
+      <text class="title" :style="{ color: theme?.textColor || '#333' }">关于我</text>
     </view>
 
     <!-- 加载状态 -->
@@ -22,7 +22,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import useTheme from '@/mixins/themeMixin'
+
+const { theme, themeStyle, cardStyle } = useTheme()
+const headerStyle = computed(() => cardStyle.value)
 
 const url = ref('')
 const isLoading = ref(true)
@@ -76,17 +80,14 @@ onMounted(() => {
 <style>
 .container {
   min-height: 100vh;
-  background-color: #f5f6fa;
   position: relative;
 }
 
 .nav-bar {
-  background-color: #fff;
   padding: 20rpx 30rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1rpx solid #eee;
   position: fixed;
   top: 0;
   left: 0;
@@ -99,7 +100,6 @@ onMounted(() => {
 .title {
   font-size: 36rpx;
   font-weight: bold;
-  color: #333;
   display: block;
 }
 

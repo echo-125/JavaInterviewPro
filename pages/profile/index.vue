@@ -204,7 +204,7 @@ const importQuestions = () => {
 // 页面导航
 const navigateToAbout = () => {
   uni.navigateTo({
-    url: '/pages/profile/about'
+    url: '/pages/webview/index?url=' + encodeURIComponent('https://www.he2000.top/about/')
   })
 }
 
