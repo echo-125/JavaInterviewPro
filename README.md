@@ -140,4 +140,114 @@
 6. 语音功能增强
    - 支持在线TTS转换
    - 支持自定义音色
-   - 支持批量音频下载 
+   - 支持批量音频下载
+
+## 数据库设计
+
+### 分类表 (category)
+```sql
+CREATE TABLE category (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### 题目映射表 (question_map)
+```sql
+CREATE TABLE question_map (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    uri TEXT,
+    answer TEXT,
+    sort_order INTEGER DEFAULT 0,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_learned INTEGER DEFAULT 0,
+    learn_time TIMESTAMP,
+    is_favorite INTEGER DEFAULT 0,
+    favorite_time TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES category(id)
+);
+```
+
+### 索引
+```sql
+-- 分类索引
+CREATE INDEX idx_category_id ON question_map(category_id);
+
+-- 学习状态索引
+CREATE INDEX idx_is_learned ON question_map(is_learned);
+
+-- 收藏状态索引
+CREATE INDEX idx_is_favorite ON question_map(is_favorite);
+```
+
+## 主要功能说明
+
+### 1. 题目学习
+- 支持标记题目为"已学习"
+- 记录学习时间
+- 显示学习进度
+
+### 2. 收藏功能
+- 支持收藏/取消收藏题目
+- 收藏列表按时间倒序排列
+- 显示收藏数量
+
+### 3. 分类管理
+- 按分类浏览题目
+- 显示分类完成进度
+- 支持分类内题目排序
+
+### 4. 数据统计
+- 总题目数统计
+- 已完成题目统计
+- 收藏题目统计
+
+## 技术栈
+
+- 前端：Vue 3 + uni-app
+- 数据库：SQLite
+- 状态管理：Vue 3 Composition API
+
+## 开发环境
+
+- Node.js >= 14
+- HBuilderX
+- 微信开发者工具
+
+## 安装和运行
+
+1. 克隆项目
+```bash
+git clone [项目地址]
+```
+
+2. 安装依赖
+```bash
+npm install
+```
+
+3. 运行项目
+```bash
+npm run dev
+```
+
+## 注意事项
+
+1. 首次运行需要初始化数据库
+2. 确保微信开发者工具已开启"不校验合法域名"选项
+3. 建议在真机上测试，以获得更好的体验
+
+## 贡献指南
+
+1. Fork 项目
+2. 创建特性分支
+3. 提交更改
+4. 推送到分支
+5. 创建 Pull Request
+
+## 许可证
+
+MIT License 
