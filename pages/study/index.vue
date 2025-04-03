@@ -2,16 +2,46 @@
   <view class="container">
     <!-- 顶部搜索栏 -->
     <view class="search-bar">
-      <input 
-        type="text" 
-        v-model="searchText" 
-        placeholder="搜索题目" 
-        @input="handleSearch"
-      />
+      <view class="search-input-wrap">
+        <input 
+          type="text" 
+          v-model="searchText" 
+          placeholder="搜索题目" 
+          @input="handleSearch"
+        />
+        <view v-if="searchText" class="clear-icon" @click="clearSearch">
+          <text class="icon">×</text>
+        </view>
+      </view>
     </view>
+
+    <!-- 搜索结果列表 -->
+    <scroll-view 
+      v-if="isSearching"
+      scroll-y 
+      class="search-list"
+      refresher-enabled
+      :refresher-triggered="isRefreshing"
+      @refresherrefresh="onRefresh"
+    >
+      <view 
+        v-for="question in searchResults" 
+        :key="question.id" 
+        class="search-item"
+        @click="navigateToQuestion(question)"
+      >
+        <text class="question-title">{{ question.title }}</text>
+      </view>
+
+      <!-- 搜索结果为空 -->
+      <view v-if="!isLoading && searchResults.length === 0" class="empty">
+        <text>未找到相关题目</text>
+      </view>
+    </scroll-view>
 
     <!-- 分类列表 -->
     <scroll-view 
+      v-else
       scroll-y 
       class="category-list"
       refresher-enabled
@@ -56,7 +86,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData } from '@/common/dbInit'
-import { getCategories } from '@/api/api'
+import { getCategories, searchQuestions } from '@/api/api'
 
 // 页面配置
 defineOptions({
@@ -68,6 +98,8 @@ const searchText = ref('')
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 const scrollTop = ref(0)
+const searchResults = ref([])
+const isSearching = ref(false)
 
 // 过滤后的分类列表
 const filteredCategories = computed(() => {
@@ -120,8 +152,27 @@ const loadCategories = async () => {
 }
 
 // 搜索处理
-const handleSearch = () => {
-  // 实时过滤，不需要额外处理
+const handleSearch = async () => {
+  if (!searchText.value.trim()) {
+    searchResults.value = []
+    isSearching.value = false
+    return
+  }
+
+  try {
+    isSearching.value = true
+    isLoading.value = true
+    const results = await searchQuestions(searchText.value)
+    searchResults.value = results
+  } catch (error) {
+    console.error('搜索题目失败:', error)
+    uni.showToast({
+      title: '搜索失败',
+      icon: 'none'
+    })
+  } finally {
+    isLoading.value = false
+  }
 }
 
 // 跳转到题目列表
@@ -134,6 +185,26 @@ const navigateToQuestions = (category) => {
       console.error('页面跳转失败:', err)
     }
   })
+}
+
+// 跳转到题目详情
+const navigateToQuestion = (question) => {
+  const url = `/pages/study/question?id=${question.id}&categoryId=${question.category_id}&categoryName=${encodeURIComponent(question.category_name)}&from=search`
+  uni.navigateTo({
+    url: url,
+    fail: (err) => {
+      console.error('页面跳转失败:', err)
+    }
+  })
+}
+
+// 清除搜索
+const clearSearch = () => {
+  searchText.value = ''
+  searchResults.value = []
+  isSearching.value = false
+  // 收起键盘
+  uni.hideKeyboard()
 }
 
 // 下拉刷新处理
@@ -235,11 +306,60 @@ defineExpose({
   margin-bottom: 20rpx;
 }
 
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .search-bar input {
+  flex: 1;
   background-color: #f5f5f5;
   padding: 20rpx;
+  padding-right: 60rpx;
   border-radius: 8rpx;
   font-size: 28rpx;
+}
+
+.clear-icon {
+  position: absolute;
+  right: 20rpx;
+  width: 40rpx;
+  height: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-icon .icon {
+  font-size: 40rpx;
+  color: #999;
+}
+
+.search-list {
+  height: calc(100vh - 180rpx);
+  padding: 16rpx;
+  box-sizing: border-box;
+}
+
+.search-item {
+  background-color: #fff;
+  padding: 20rpx;
+  border-radius: 16rpx;
+  margin-bottom: 12rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+.search-item:active {
+  transform: scale(0.98);
+  background-color: #fafafa;
+}
+
+.question-title {
+  font-size: 32rpx;
+  color: #333;
+  display: block;
 }
 
 .category-list {

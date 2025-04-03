@@ -420,4 +420,43 @@ export async function getCategoryProgress(categoryId) {
     } finally {
         await closeDB()
     }
+}
+
+/**
+ * 搜索题目
+ * @param {string} keyword 搜索关键词
+ * @returns {Promise<Array>} 返回匹配的题目列表
+ */
+export async function searchQuestions(keyword) {
+    await openDB()
+    try {
+        const sql = `
+            SELECT 
+                q.id,
+                q.title,
+                q.uri,
+                q.sort_order,
+                q.is_learned,
+                q.learn_time,
+                q.is_favorite,
+                q.favorite_time,
+                c.name as category_name
+            FROM question_map q
+            LEFT JOIN category c ON q.category_id = c.id
+            WHERE q.title LIKE '%${keyword}%'
+            ORDER BY q.sort_order
+        `
+        const result = await db.selectTableDataBySql(sql)
+        return result.map(item => ({
+            ...item,
+            is_favorite: Boolean(item.is_favorite),
+            is_learned: Boolean(item.is_learned),
+            last_study_time: item.learn_time || null
+        }))
+    } catch (error) {
+        console.error('搜索题目失败:', error)
+        return []
+    } finally {
+        await closeDB()
+    }
 } 

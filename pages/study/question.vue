@@ -172,51 +172,62 @@ const loadQuestions = async () => {
     try {
         isLoading.value = true
         await checkAndInitDB()
-        const result = await getQuestionsWithStatus(categoryId.value)
         
-        if (result && result.length > 0) {
-            questions.value = result.map(question => ({
-                ...question,
-                last_study_time: question.learn_time || null,
-                is_favorite: Boolean(question.is_favorite),
-                is_learned: Boolean(question.is_learned)
-            }))
-            
-            const pages = getCurrentPages()
-            const currentPage = pages[pages.length - 1]
-            const { from } = currentPage.$page.options
-            
-            if (from === 'favorite') {
-                const currentQuestionId = parseInt(questionId.value)
-                const exists = questions.value.some(q => q.id === currentQuestionId)
-                if (!exists) {
-                    const currentQuestion = await getQuestionById(currentQuestionId)
-                    if (currentQuestion) {
-                        questions.value.unshift({
-                            ...currentQuestion,
-                            last_study_time: currentQuestion.learn_time || null,
-                            is_favorite: true,
-                            is_learned: Boolean(currentQuestion.is_learned)
-                        })
-                    }
-                } else {
-                    const questionIndex = questions.value.findIndex(q => q.id === currentQuestionId)
-                    if (questionIndex !== -1) {
-                        questions.value[questionIndex].is_favorite = true
-                        questions.value[questionIndex].is_learned = Boolean(questions.value[questionIndex].is_learned)
-                    }
-                }
-            }
-            
-            if (from === 'favorite') {
-                const currentQuestionId = parseInt(questionId.value)
-                const index = questions.value.findIndex(q => q.id === currentQuestionId)
-                if (index !== -1) {
-                    currentIndex.value = index
-                }
+        const pages = getCurrentPages()
+        const currentPage = pages[pages.length - 1]
+        const { from } = currentPage.$page.options
+        
+        if (from === 'search') {
+            // 从搜索结果跳转来的，只加载当前题目
+            const currentQuestion = await getQuestionById(questionId.value)
+            if (currentQuestion) {
+                questions.value = [currentQuestion]
+                currentIndex.value = 0
             }
         } else {
-            questions.value = []
+            // 正常加载分类下的所有题目
+            const result = await getQuestionsWithStatus(categoryId.value)
+            
+            if (result && result.length > 0) {
+                questions.value = result.map(question => ({
+                    ...question,
+                    last_study_time: question.learn_time || null,
+                    is_favorite: Boolean(question.is_favorite),
+                    is_learned: Boolean(question.is_learned)
+                }))
+                
+                if (from === 'favorite') {
+                    const currentQuestionId = parseInt(questionId.value)
+                    const exists = questions.value.some(q => q.id === currentQuestionId)
+                    if (!exists) {
+                        const currentQuestion = await getQuestionById(currentQuestionId)
+                        if (currentQuestion) {
+                            questions.value.unshift({
+                                ...currentQuestion,
+                                last_study_time: currentQuestion.learn_time || null,
+                                is_favorite: true,
+                                is_learned: Boolean(currentQuestion.is_learned)
+                            })
+                        }
+                    } else {
+                        const questionIndex = questions.value.findIndex(q => q.id === currentQuestionId)
+                        if (questionIndex !== -1) {
+                            questions.value[questionIndex].is_favorite = true
+                            questions.value[questionIndex].is_learned = Boolean(questions.value[questionIndex].is_learned)
+                        }
+                    }
+                }
+                
+                if (from === 'favorite') {
+                    const currentQuestionId = parseInt(questionId.value)
+                    const index = questions.value.findIndex(q => q.id === currentQuestionId)
+                    if (index !== -1) {
+                        currentIndex.value = index
+                    }
+                }
+            } else {
+                questions.value = []
+            }
         }
     } catch (error) {
         console.error('加载题目失败:', error)
