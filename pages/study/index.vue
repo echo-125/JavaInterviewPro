@@ -1,16 +1,17 @@
 <template>
-  <view class="container">
+  <view class="container" :style="themeStyle">
     <!-- 顶部搜索栏 -->
-    <view class="search-bar">
+    <view class="search-bar" :style="cardStyle">
       <view class="search-input-wrap">
         <input 
           type="text" 
           v-model="searchText" 
           placeholder="搜索题目" 
+          :style="{ color: theme.textColor, backgroundColor: theme.backgroundColor }"
           @input="handleSearch"
         />
         <view v-if="searchText" class="clear-icon" @click="clearSearch">
-          <text class="icon">×</text>
+          <text class="icon" :style="{ color: theme.secondaryTextColor }">×</text>
         </view>
       </view>
     </view>
@@ -28,14 +29,15 @@
         v-for="question in searchResults" 
         :key="question.id" 
         class="search-item"
+        :style="cardStyle"
         @click="navigateToQuestion(question)"
       >
-        <text class="question-title">{{ question.title }}</text>
+        <text class="question-title" :style="{ color: theme.textColor }">{{ question.title }}</text>
       </view>
 
       <!-- 搜索结果为空 -->
       <view v-if="!isLoading && searchResults.length === 0" class="empty">
-        <text>未找到相关题目</text>
+        <text :style="{ color: theme.secondaryTextColor }">未找到相关题目</text>
       </view>
     </scroll-view>
 
@@ -52,11 +54,12 @@
         v-for="category in filteredCategories" 
         :key="category.id" 
         class="category-item"
+        :style="cardStyle"
         @click="navigateToQuestions(category)"
       >
         <view class="category-info">
-          <text class="category-name">{{ category.name }}</text>
-          <text class="category-count">{{ category.questionCount }}题</text>
+          <text class="category-name" :style="{ color: theme.textColor }">{{ category.name }}</text>
+          <text class="category-count" :style="{ color: theme.secondaryTextColor }">{{ category.questionCount }}题</text>
         </view>
         <view class="progress-bar">
           <view 
@@ -65,19 +68,19 @@
           ></view>
         </view>
         <view class="category-stats">
-          <text class="completed-count">已学习: {{ category.completedCount }}</text>
-          <text class="progress-text">{{ category.progress }}%</text>
+          <text class="completed-count" :style="{ color: theme.secondaryTextColor }">已学习: {{ category.completedCount }}</text>
+          <text class="progress-text" :style="{ color: theme.primaryColor }">{{ category.progress }}%</text>
         </view>
       </view>
 
       <!-- 加载状态 -->
       <view v-if="isLoading" class="loading">
-        <text>加载中...</text>
+        <text :style="{ color: theme.secondaryTextColor }">加载中...</text>
       </view>
 
       <!-- 空状态 -->
       <view v-if="!isLoading && categories.length === 0" class="empty">
-        <text>暂无分类数据</text>
+        <text :style="{ color: theme.secondaryTextColor }">暂无分类数据</text>
       </view>
     </scroll-view>
   </view>
@@ -87,6 +90,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData } from '@/common/dbInit'
 import { getCategories, searchQuestions } from '@/api/api'
+import useTheme from '@/mixins/themeMixin'
 
 // 页面配置
 defineOptions({
@@ -100,6 +104,8 @@ const isRefreshing = ref(false)
 const scrollTop = ref(0)
 const searchResults = ref([])
 const isSearching = ref(false)
+
+const { theme, themeStyle, cardStyle } = useTheme()
 
 // 过滤后的分类列表
 const filteredCategories = computed(() => {
@@ -295,15 +301,15 @@ defineExpose({
 <style>
 .container {
   min-height: 100vh;
-  background-color: #f8f8f8;
-  padding: 20rpx;
+  padding: 40rpx 0;
+  transition: background-color 0.3s ease;
 }
 
 .search-bar {
-  background-color: #fff;
   padding: 20rpx;
   border-radius: 12rpx;
-  margin-bottom: 20rpx;
+  margin: 20rpx;
+  transition: all 0.3s ease;
 }
 
 .search-input-wrap {
@@ -314,11 +320,11 @@ defineExpose({
 
 .search-bar input {
   flex: 1;
-  background-color: #f5f5f5;
   padding: 20rpx;
   padding-right: 60rpx;
   border-radius: 8rpx;
   font-size: 28rpx;
+  transition: all 0.3s ease;
 }
 
 .clear-icon {
@@ -333,7 +339,7 @@ defineExpose({
 
 .clear-icon .icon {
   font-size: 40rpx;
-  color: #999;
+  transition: color 0.3s ease;
 }
 
 .search-list {
@@ -343,34 +349,32 @@ defineExpose({
 }
 
 .search-item {
-  background-color: #fff;
   padding: 20rpx;
   border-radius: 16rpx;
   margin-bottom: 12rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease;
 }
 
 .search-item:active {
   transform: scale(0.98);
-  background-color: #fafafa;
 }
 
 .question-title {
   font-size: 32rpx;
-  color: #333;
-  display: block;
+  transition: color 0.3s ease;
 }
 
 .category-list {
-  height: calc(100vh - 180rpx);
+  height: calc(100vh - 200rpx);
+  padding: 0 20rpx;
+  box-sizing: border-box;
 }
 
 .category-item {
-  background-color: #fff;
   padding: 30rpx;
   border-radius: 12rpx;
   margin-bottom: 20rpx;
+  transition: all 0.3s ease;
 }
 
 .category-info {
@@ -383,19 +387,20 @@ defineExpose({
 .category-name {
   font-size: 32rpx;
   font-weight: bold;
-  color: #333;
+  transition: color 0.3s ease;
 }
 
 .category-count {
   font-size: 24rpx;
-  color: #666;
+  transition: color 0.3s ease;
 }
 
 .progress-bar {
   height: 8rpx;
-  background-color: #f5f5f5;
+  background-color: rgba(0, 0, 0, 0.1);
   border-radius: 4rpx;
   margin-bottom: 10rpx;
+  transition: background-color 0.3s ease;
 }
 
 .progress-inner {
@@ -413,19 +418,23 @@ defineExpose({
 
 .completed-count {
   font-size: 24rpx;
-  color: #666;
+  transition: color 0.3s ease;
 }
 
 .progress-text {
   font-size: 24rpx;
-  color: #007AFF;
   font-weight: bold;
+  transition: color 0.3s ease;
 }
 
 .loading, .empty {
   text-align: center;
   padding: 40rpx;
-  color: #999;
   font-size: 28rpx;
+  transition: color 0.3s ease;
+}
+
+.card {
+  transition: all 0.3s ease;
 }
 </style> 

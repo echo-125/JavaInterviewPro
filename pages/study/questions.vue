@@ -1,15 +1,15 @@
 <template>
-	<view class="container">
+	<view class="container" :style="themeStyle">
 		<!-- 顶部标题栏 -->
-		<view class="header">
+		<view class="header" :style="cardStyle">
 			<view class="header-left">
 				<view class="back-btn" @click="goBack">
-					<text class="back-icon">←</text>
+					<text class="back-icon" :style="{ color: theme.textColor }">←</text>
 				</view>
 			</view>
 			<view class="header-center">
-				<text class="title">{{ categoryName }}</text>
-				<text class="subtitle">已学习({{ completedCount }}/{{ questions.length }})</text>
+				<text class="title" :style="{ color: theme.textColor }">{{ categoryName }}</text>
+				<text class="subtitle" :style="{ color: theme.secondaryTextColor }">已学习({{ completedCount }}/{{ questions.length }})</text>
 			</view>
 		</view>
 
@@ -17,43 +17,44 @@
 		<scroll-view scroll-y class="question-list" refresher-enabled :refresher-triggered="isRefreshing"
 			@refresherrefresh="onRefresh" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
 			<view v-for="question in questions" :key="question.id" class="question-item"
+				:style="cardStyle"
 				@click="navigateToQuestion(question)">
 				<view class="question-info">
-					<text class="question-title">{{ question.sort_order }}. {{ question.title }}</text>
+					<text class="question-title" :style="{ color: theme.textColor }">{{ question.sort_order }}. {{ question.title }}</text>
 					<view class="question-meta">
 						<view class="question-tags">
 							<view v-if="question.is_favorite" class="tag favorite">
 								<text class="icon">★</text>
-								<text>已收藏</text>
+								<text :style="{ color: theme.textColor }">已收藏</text>
 							</view>
 							<view v-else class="tag unfavorite">
 								<text class="icon">☆</text>
-								<text>未收藏</text>
+								<text :style="{ color: theme.secondaryTextColor }">未收藏</text>
 							</view>
 							<view v-if="question.is_learned" class="tag completed">
 								<text class="icon">✓</text>
-								<text>已学习</text>
+								<text :style="{ color: theme.textColor }">已学习</text>
 							</view>
 							<view v-else class="tag uncompleted">
 								<text class="icon">○</text>
-								<text>未学习</text>
+								<text :style="{ color: theme.secondaryTextColor }">未学习</text>
 							</view>
 						</view>
 					</view>
 				</view>
 				<view class="question-arrow">
-					<text class="icon">›</text>
+					<text class="icon" :style="{ color: theme.secondaryTextColor }">›</text>
 				</view>
 			</view>
 
 			<!-- 加载状态 -->
 			<view v-if="isLoading" class="loading">
-				<text>加载中...</text>
+				<text :style="{ color: theme.secondaryTextColor }">加载中...</text>
 			</view>
 
 			<!-- 空状态 -->
 			<view v-if="!isLoading && questions.length === 0" class="empty">
-				<text>暂无题目数据</text>
+				<text :style="{ color: theme.secondaryTextColor }">暂无题目数据</text>
 			</view>
 		</scroll-view>
 	</view>
@@ -69,15 +70,9 @@
 	import { checkAndInitDB, initTables, importCategoryData, importQuestionMapData } from '@/common/dbInit'
 	import { onBackPress } from '@dcloudio/uni-app'
 	import { getQuestionsWithStatus, getCategoryProgress } from '@/api/api'
+	import useTheme from '@/mixins/themeMixin'
 
-	// 页面配置
-	defineOptions({
-		navigationStyle: 'custom',
-		navigationBarTitleText: '',
-		navigationBar: {
-			titleText: ''
-		}
-	})
+	const { theme, themeStyle, cardStyle } = useTheme()
 
 	const categoryId = ref('')
 	const categoryName = ref('')
@@ -293,29 +288,28 @@
 <style>
 	.container {
 		min-height: 100vh;
-		background-color: #f5f6fa;
-		padding-top: var(--status-bar-height);
+		padding: 40rpx 0;
+		transition: background-color 0.3s ease;
 	}
 
 	.header {
-		background-color: #fff;
 		padding: 20rpx 30rpx;
 		display: flex;
 		align-items: center;
-		border-bottom: 1rpx solid #eee;
+		border-bottom: 1rpx solid;
+		border-color: var(--border-color);
 		position: sticky;
 		top: var(--status-bar-height);
 		z-index: 100;
+		transition: all 0.3s ease;
 	}
 
 	.header-left {
 		width: 100rpx;
-		position: absolute;
-		left: 30rpx;
 	}
 
 	.header-center {
-		width: 100%;
+		flex: 1;
 		text-align: center;
 	}
 
@@ -325,35 +319,36 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		border-radius: 30rpx;
+		background-color: transparent;
+		transition: all 0.3s ease;
 	}
 
 	.back-icon {
 		font-size: 40rpx;
-		color: #333;
+		transition: color 0.3s ease;
 	}
 
 	.title {
 		font-size: 36rpx;
 		font-weight: bold;
-		color: #333;
-		display: block;
+		transition: color 0.3s ease;
 	}
 
 	.subtitle {
 		font-size: 24rpx;
-		color: #666;
 		margin-top: 8rpx;
 		display: block;
+		transition: color 0.3s ease;
 	}
 
 	.question-list {
-		height: calc(100vh - var(--status-bar-height) - 100rpx);
-		padding: 16rpx;
+		height: calc(100vh - 200rpx);
+		padding: 0 20rpx;
 		box-sizing: border-box;
 	}
 
 	.question-item {
-		background-color: #fff;
 		padding: 20rpx;
 		border-radius: 16rpx;
 		margin-bottom: 12rpx;
@@ -361,7 +356,6 @@
 		align-items: center;
 		box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
 		transition: all 0.3s ease;
-		min-height: 100rpx;
 	}
 
 	.question-item:active {
@@ -371,94 +365,73 @@
 
 	.question-info {
 		flex: 1;
-		margin-right: 12rpx;
-		display: flex;
-		align-items: center;
+		min-width: 0;
 	}
 
 	.question-title {
-		flex: 1;
 		font-size: 28rpx;
-		color: #333;
-		line-height: 1.4;
-		margin-right: 12rpx;
-		display: -webkit-box;
-		-webkit-box-orient: vertical;
-		-webkit-line-clamp: 2;
-		overflow: hidden;
+		line-height: 1.6;
+		margin-bottom: 8rpx;
+		transition: color 0.3s ease;
 	}
 
 	.question-meta {
 		display: flex;
 		align-items: center;
-		min-width: 90rpx;
+		justify-content: space-between;
 	}
 
 	.question-tags {
 		display: flex;
-		flex-direction: column;
-		gap: 6rpx;
-		align-self: center;
+		gap: 12rpx;
 	}
 
 	.tag {
-		font-size: 18rpx;
-		padding: 2rpx 8rpx;
-		border-radius: 16rpx;
-		display: inline-flex;
+		display: flex;
 		align-items: center;
-		gap: 2rpx;
-		line-height: 1.2;
-		white-space: nowrap;
+		gap: 4rpx;
+		padding: 4rpx 12rpx;
+		border-radius: 20rpx;
+		font-size: 24rpx;
+		transition: all 0.3s ease;
 	}
 
-	.tag .icon {
-		font-size: 18rpx;
-		margin-right: 2rpx;
-	}
-
-	.tag.favorite, .tag.unfavorite {
-		background-color: #fff3e0;
-		color: #ff9800;
-		border: 1rpx solid #ffb74d;
-	}
-
-	.tag.completed, .tag.uncompleted {
-		background-color: #e8f5e9;
-		color: #4caf50;
-		border: 1rpx solid #81c784;
+	.tag.favorite {
+		background-color: rgba(255, 215, 0, 0.1);
 	}
 
 	.tag.unfavorite {
-		background-color: #f5f5f5;
-		color: #9e9e9e;
-		border: 1rpx solid #e0e0e0;
+		background-color: rgba(0, 0, 0, 0.05);
 	}
-	
+
+	.tag.completed {
+		background-color: rgba(76, 175, 80, 0.1);
+	}
+
 	.tag.uncompleted {
-		background-color: #f5f5f5;
-		color: #9e9e9e;
-		border: 1rpx solid #e0e0e0;
+		background-color: rgba(0, 0, 0, 0.05);
+	}
+
+	.tag .icon {
+		font-size: 24rpx;
 	}
 
 	.question-arrow {
+		margin-left: 16rpx;
 		display: flex;
 		align-items: center;
-		padding: 0 8rpx;
-		align-self: center;
 	}
 
 	.question-arrow .icon {
-		font-size: 32rpx;
-		color: #ccc;
+		font-size: 40rpx;
+		transition: color 0.3s ease;
 	}
 
 	.loading,
 	.empty {
+		padding: 40rpx 0;
 		text-align: center;
-		padding: 40rpx;
-		color: #999;
-		font-size: 28rpx;
+		transition: color 0.3s ease;
 	}
 
 	/* 添加滚动条样式 */

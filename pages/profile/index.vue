@@ -1,63 +1,58 @@
 <template>
-  <view class="container">
-    <view class="header">
+  <view class="container" :style="themeStyle">
+    <view class="header" :style="headerStyle">
       <view class="avatar-section">
         <image class="avatar" src="/static/images/avatar.png" mode="aspectFill"></image>
-        <text class="nickname">iKun</text>
+        <text class="nickname" :style="{ color: theme.textColor }">iKun</text>
       </view>
-      <view class="stats-section">
+      <view class="stats-section" :style="{ borderColor: theme.borderColor }">
         <view class="stat-item">
-          <text class="stat-value">{{ stats.total }}</text>
-          <text class="stat-label">总题目</text>
+          <text class="stat-value" :style="{ color: theme.primaryColor }">{{ stats.total }}</text>
+          <text class="stat-label" :style="{ color: theme.secondaryTextColor }">总题目</text>
         </view>
         <view class="stat-item">
-          <text class="stat-value">{{ stats.completed }}</text>
-          <text class="stat-label">已完成</text>
+          <text class="stat-value" :style="{ color: theme.primaryColor }">{{ stats.completed }}</text>
+          <text class="stat-label" :style="{ color: theme.secondaryTextColor }">已完成</text>
         </view>
         <view class="stat-item">
-          <text class="stat-value">{{ stats.favorites }}</text>
-          <text class="stat-label">收藏</text>
+          <text class="stat-value" :style="{ color: theme.primaryColor }">{{ stats.favorites }}</text>
+          <text class="stat-label" :style="{ color: theme.secondaryTextColor }">收藏</text>
         </view>
       </view>
     </view>
 
     <view class="menu-list">
-      <view class="menu-group">
-        <view class="menu-item" @click="navigateToHistory">
-          <text class="menu-icon">📅</text>
-          <text class="menu-text">学习历史</text>
-          <text class="menu-arrow">></text>
-        </view>
-        <view class="menu-item" @click="navigateToWrongQuestions">
-          <text class="menu-icon">❌</text>
-          <text class="menu-text">错题本</text>
-          <text class="menu-arrow">></text>
-        </view>
-      </view>
-
-      <view class="menu-group">
-        <view class="menu-item" @click="toggleDarkMode">
+      <view class="menu-group" :style="menuGroupStyle">
+        <view class="menu-item" :style="{ borderColor: theme.borderColor }">
           <text class="menu-icon">🌙</text>
-          <text class="menu-text">深色模式</text>
-          <switch :checked="isDarkMode" @change="toggleDarkMode" />
+          <text class="menu-text" :style="{ color: theme.textColor }">深色模式</text>
+          <switch :checked="isDarkMode" @change="toggleDarkMode" color="#007AFF" />
         </view>
-        <view class="menu-item" @click="clearCache">
+        <view class="menu-item" :style="{ borderColor: theme.borderColor }" @click="clearCache">
           <text class="menu-icon">🗑️</text>
-          <text class="menu-text">清除缓存</text>
-          <text class="menu-arrow">></text>
+          <text class="menu-text" :style="{ color: theme.textColor }">清除缓存</text>
+          <text class="menu-arrow" :style="{ color: theme.secondaryTextColor }">></text>
         </view>
       </view>
 
-      <view class="menu-group">
-        <view class="menu-item" @click="navigateToAbout">
-          <text class="menu-icon">ℹ️</text>
-          <text class="menu-text">关于我们</text>
-          <text class="menu-arrow">></text>
+      <view class="menu-group" :style="menuGroupStyle">
+        <view class="menu-item" :style="{ borderColor: theme.borderColor }" @click="resetData">
+          <text class="menu-icon">🔄</text>
+          <text class="menu-text" :style="{ color: theme.textColor }">重置数据</text>
+          <text class="menu-arrow" :style="{ color: theme.secondaryTextColor }">></text>
         </view>
-        <view class="menu-item" @click="navigateToFeedback">
-          <text class="menu-icon">📝</text>
-          <text class="menu-text">意见反馈</text>
-          <text class="menu-arrow">></text>
+        <view class="menu-item" :style="{ borderColor: theme.borderColor }" @click="importQuestions">
+          <text class="menu-icon">📥</text>
+          <text class="menu-text" :style="{ color: theme.textColor }">导入题库</text>
+          <text class="menu-arrow" :style="{ color: theme.secondaryTextColor }">></text>
+        </view>
+      </view>
+
+      <view class="menu-group" :style="menuGroupStyle">
+        <view class="menu-item" :style="{ borderColor: theme.borderColor }" @click="navigateToAbout">
+          <text class="menu-icon">👤</text>
+          <text class="menu-text" :style="{ color: theme.textColor }">关于我</text>
+          <text class="menu-arrow" :style="{ color: theme.secondaryTextColor }">></text>
         </view>
       </view>
     </view>
@@ -65,9 +60,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import db from '@/common/database'
 import { getUserStats } from '@/api/api.js'
+import { getTheme, setTheme, getThemeVariables } from '@/utils/theme'
+import useTheme from '@/mixins/themeMixin'
 
 const userInfo = ref({
   username: '',
@@ -83,8 +80,12 @@ const stats = ref({
   favorites: 0
 })
 
-const isDarkMode = ref(false)
 const isLoading = ref(false)
+const { isDarkMode, theme, themeStyle, cardStyle } = useTheme()
+
+// 计算主题样式
+const headerStyle = computed(() => cardStyle.value)
+const menuGroupStyle = computed(() => cardStyle.value)
 
 // 加载用户信息
 async function loadUserInfo() {
@@ -109,23 +110,10 @@ async function loadUserInfo() {
   }
 }
 
-// 格式化日期
-const formatDate = (timestamp) => {
-  if (!timestamp) return '未学习'
-  const date = new Date(timestamp)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 // 切换深色模式
-const toggleDarkMode = () => {
-  isDarkMode.value = !isDarkMode.value
-  // TODO: 实现深色模式切换逻辑
+const toggleDarkMode = async (e) => {
+  const newTheme = e.detail.value ? 'dark' : 'light'
+  await setTheme(newTheme)
 }
 
 // 清除缓存
@@ -145,71 +133,96 @@ const clearCache = () => {
   })
 }
 
+// 重置数据
+const resetData = () => {
+  uni.showModal({
+    title: '警告',
+    content: '确定要重置所有数据吗？此操作不可恢复！',
+    success: (res) => {
+      if (res.confirm) {
+        // TODO: 实现重置数据逻辑
+        uni.showToast({
+          title: '重置成功',
+          icon: 'success'
+        })
+      }
+    }
+  })
+}
+
+// 导入题库
+const importQuestions = () => {
+  uni.showModal({
+    title: '提示',
+    content: '确定要导入题库吗？这将覆盖现有数据。',
+    success: (res) => {
+      if (res.confirm) {
+        // TODO: 实现导入题库逻辑
+        uni.showToast({
+          title: '导入成功',
+          icon: 'success'
+        })
+      }
+    }
+  })
+}
+
 // 页面导航
-const navigateToHistory = () => {
-  uni.navigateTo({
-    url: '/pages/profile/history'
-  })
-}
-
-const navigateToWrongQuestions = () => {
-  uni.navigateTo({
-    url: '/pages/profile/wrong-questions'
-  })
-}
-
 const navigateToAbout = () => {
   uni.navigateTo({
     url: '/pages/profile/about'
   })
 }
 
-const navigateToFeedback = () => {
-  uni.navigateTo({
-    url: '/pages/profile/feedback'
-  })
-}
-
 onMounted(() => {
   loadUserInfo()
+})
+
+// 页面卸载时移除事件监听
+onUnmounted(() => {
+  uni.$off('themeChanged', handleThemeChange)
 })
 </script>
 
 <style>
 .container {
   min-height: 100vh;
-  background-color: #f8f8f8;
+  transition: background-color 0.3s ease;
 }
 
 .header {
-  background-color: #fff;
   padding: 40rpx 30rpx;
   margin-bottom: 20rpx;
+  transition: all 0.3s ease;
 }
 
 .avatar-section {
   display: flex;
+  flex-direction: column;
   align-items: center;
   margin-bottom: 30rpx;
 }
 
 .avatar {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 60rpx;
-  margin-right: 20rpx;
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 80rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.1);
 }
 
 .nickname {
-  font-size: 32rpx;
+  font-size: 44rpx;
   font-weight: bold;
+  transition: color 0.3s ease;
 }
 
 .stats-section {
   display: flex;
   justify-content: space-around;
-  border-top: 1rpx solid #eee;
+  border-top: 1rpx solid;
   padding-top: 30rpx;
+  transition: border-color 0.3s ease;
 }
 
 .stat-item {
@@ -217,17 +230,17 @@ onMounted(() => {
 }
 
 .stat-value {
-  font-size: 36rpx;
+  font-size: 40rpx;
   font-weight: bold;
-  color: #007AFF;
   display: block;
+  transition: color 0.3s ease;
 }
 
 .stat-label {
   font-size: 24rpx;
-  color: #666;
   margin-top: 10rpx;
   display: block;
+  transition: color 0.3s ease;
 }
 
 .menu-list {
@@ -235,17 +248,18 @@ onMounted(() => {
 }
 
 .menu-group {
-  background-color: #fff;
-  border-radius: 12rpx;
+  border-radius: 16rpx;
   margin-bottom: 20rpx;
   overflow: hidden;
+  transition: all 0.3s ease;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
   padding: 30rpx;
-  border-bottom: 1rpx solid #eee;
+  border-bottom: 1rpx solid;
+  transition: all 0.3s ease;
 }
 
 .menu-item:last-child {
@@ -259,12 +273,12 @@ onMounted(() => {
 
 .menu-text {
   flex: 1;
-  font-size: 28rpx;
-  color: #333;
+  font-size: 32rpx;
+  transition: color 0.3s ease;
 }
 
 .menu-arrow {
-  font-size: 28rpx;
-  color: #999;
+  font-size: 32rpx;
+  transition: color 0.3s ease;
 }
 </style> 

@@ -1,9 +1,9 @@
 <template>
-  <view class="container">
+  <view class="container" :style="themeStyle">
     <view class="header">
       <view class="header-row">
-        <text class="title">收藏</text>
-        <text class="subtitle">共{{favorites.length}}题</text>
+        <text class="title" :style="{ color: theme.textColor }">收藏</text>
+        <text class="subtitle" :style="{ color: theme.secondaryTextColor }">共{{favorites.length}}题</text>
       </view>
     </view>
     <scroll-view 
@@ -15,20 +15,24 @@
     >
       <view v-for="(item, index) in favorites" :key="index" 
             class="favorite-item" 
+            :style="cardStyle"
             @click="navigateToQuestion(item)">
         <view class="question-info">
-          <text class="question-title">{{item.title}}</text>
+          <text class="question-title" :style="{ color: theme.textColor }">{{item.title}}</text>
           <view class="meta-row">
-            <text class="question-category">{{item.category_name}}</text>
-            <text class="study-time" v-if="item.learn_time">上次学习: {{formatDateTime(item.learn_time)}}</text>
+            <text class="question-category" :style="{ color: theme.secondaryTextColor }">{{item.category_name}}</text>
+            <text class="study-time" v-if="item.learn_time" :style="{ color: theme.secondaryTextColor }">上次学习: {{formatDateTime(item.learn_time)}}</text>
           </view>
         </view>
       </view>
       
       <view class="empty-state" v-if="favorites.length === 0">
-        <text class="empty-text">暂无收藏题目</text>
+        <text class="empty-text" :style="{ color: theme.secondaryTextColor }">暂无收藏题目</text>
       </view>
     </scroll-view>
+    <view class="card" :style="cardStyle">
+      <!-- 卡片内容 -->
+    </view>
   </view>
 </template>
 
@@ -36,10 +40,13 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import db from '@/common/database'
 import { formatDateTime } from '@/utils/dateUtil'
+import useTheme from '@/mixins/themeMixin'
 
 const favorites = ref([])
 const isLoading = ref(false)
 const isRefreshing = ref(false)
+
+const { theme, themeStyle, cardStyle } = useTheme()
 
 // 加载收藏列表
 const loadFavorites = async () => {
@@ -150,6 +157,8 @@ defineExpose({
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
+  transition: background-color 0.3s ease;
 }
 
 .header {
@@ -167,12 +176,12 @@ defineExpose({
 .title {
   font-size: 28rpx;
   font-weight: bold;
-  color: #333;
+  transition: color 0.3s ease;
 }
 
 .subtitle {
   font-size: 24rpx;
-  color: #666;
+  transition: color 0.3s ease;
 }
 
 .favorite-list {
@@ -181,11 +190,10 @@ defineExpose({
 }
 
 .favorite-item {
-  background-color: #fff;
   border-radius: 12rpx;
   padding: 20rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
 }
 
 .question-info {
@@ -195,7 +203,7 @@ defineExpose({
 .question-title {
   font-size: 32rpx;
   font-weight: 500;
-  color: #333;
+  transition: color 0.3s ease;
   margin-bottom: 8rpx;
   display: block;
 }
@@ -208,14 +216,14 @@ defineExpose({
 
 .question-category {
   font-size: 24rpx;
-  color: #666;
+  transition: color 0.3s ease;
 }
 
 .study-time {
   font-size: 24rpx;
-  color: #999;
-  border-left: 2rpx solid #eee;
+  border-left: 2rpx solid;
   padding-left: 20rpx;
+  transition: all 0.3s ease;
 }
 
 .empty-state {
@@ -225,6 +233,10 @@ defineExpose({
 
 .empty-text {
   font-size: 28rpx;
-  color: #999;
+  transition: color 0.3s ease;
+}
+
+.card {
+  transition: all 0.3s ease;
 }
 </style> 

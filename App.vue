@@ -1,5 +1,6 @@
 <script>
 import { checkAndInitDB } from '@/common/dbInit.js'
+import { getTheme, setTheme } from '@/utils/theme'
 
 export default {
 	onLaunch: async function() {
@@ -11,6 +12,10 @@ export default {
 			
 			await checkAndInitDB()
 			uni.hideLoading()
+			
+			// 初始化主题
+			const theme = getTheme()
+			setTheme(theme)
 			
 			uni.reLaunch({
 				url: '/pages/study/index',
@@ -69,7 +74,9 @@ export default {
 
 	/* 全局样式 */
 	page {
-		background-color: #f8f8f8;
+		background-color: var(--background-color);
+		color: var(--text-color);
+		transition: background-color 0.3s ease, color 0.3s ease;
 		font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica,
 			Segoe UI, Arial, Roboto, 'PingFang SC', 'miui', 'Hiragino Sans GB', 'Microsoft Yahei',
 			sans-serif;

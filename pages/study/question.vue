@@ -1,13 +1,13 @@
 <template>
-  <view class="container">
+  <view class="container" :style="themeStyle">
     <!-- 顶部导航栏 -->
-    <view class="nav-bar">
+    <view class="nav-bar" :style="cardStyle">
       <view class="nav-left" @click="navigateBack">
-        <text class="nav-icon">←</text>
+        <text class="nav-icon" :style="{ color: theme.textColor }">←</text>
       </view>
       <view class="nav-title">
-        <text class="title">{{ categoryName }}</text>
-        <text class="subtitle">{{ currentIndex + 1 }}/{{ totalQuestions }}</text>
+        <text class="title" :style="{ color: theme.textColor }">{{ categoryName }}</text>
+        <text class="subtitle" :style="{ color: theme.secondaryTextColor }">{{ currentIndex + 1 }}/{{ totalQuestions }}</text>
       </view>
       <view class="nav-right">
         <text class="favorite-icon" @click="toggleFavoriteStatus">{{ isFavorite ? '★' : '☆' }}</text>
@@ -16,23 +16,23 @@
 
     <!-- 题目内容 -->
     <scroll-view scroll-y class="content">
-      <view class="question-content">
-        <text class="question-title">{{ currentQuestion.title }}</text>
+      <view class="question-content" :style="cardStyle">
+        <text class="question-title" :style="{ color: theme.textColor }">{{ currentQuestion.title }}</text>
         <view class="question-meta">
           <view class="study-badge" 
                 :class="{ studied: currentQuestion.is_learned }"
                 @click="handleStudyBadgeClick">
-            <text class="study-status">{{ currentQuestion.is_learned ? '已学习' : '未学习' }}</text>
-            <text v-if="currentQuestion.last_study_time" class="study-time">{{ formatDateTime(currentQuestion.last_study_time) }}</text>
+            <text class="study-status" :style="{ color: theme.secondaryTextColor }">{{ currentQuestion.is_learned ? '已学习' : '未学习' }}</text>
+            <text v-if="currentQuestion.last_study_time" class="study-time" :style="{ color: theme.secondaryTextColor }">{{ formatDateTime(currentQuestion.last_study_time) }}</text>
           </view>
         </view>
       </view>
 
       <!-- 答案部分 -->
-      <view class="answer-section">
+      <view class="answer-section" :style="cardStyle">
         <view class="answer-header">
           <view class="answer-title-wrapper">
-            <text class="answer-title">答案解析</text>
+            <text class="answer-title" :style="{ color: theme.textColor }">答案解析</text>
             <view class="audio-player">
               <view class="play-btn" 
                     :class="{ 'playing': isPlaying }"
@@ -47,42 +47,42 @@
                   <view class="progress-inner" :style="{ width: progress + '%' }"></view>
                 </view>
                 <view class="time-info">
-                  <text class="time-text">{{ formatTime(currentTime) }}</text>
-                  <text class="time-text">{{ formatTime(duration) }}</text>
+                  <text class="time-text" :style="{ color: theme.secondaryTextColor }">{{ formatTime(currentTime) }}</text>
+                  <text class="time-text" :style="{ color: theme.secondaryTextColor }">{{ formatTime(duration) }}</text>
                 </view>
               </view>
             </view>
           </view>
         </view>
         <view class="answer-content">
-          <rich-text class="answer-text" :nodes="currentQuestion.answer || '暂无答案'"></rich-text>
+          <rich-text class="answer-text" :style="{ color: theme.textColor }" :nodes="currentQuestion.answer || '暂无答案'"></rich-text>
           <view v-if="currentQuestion.uri" class="detail-link" @click="openDetail">
-            <text class="link-text">查看详情</text>
+            <text class="link-text" :style="{ color: theme.primaryColor }">查看详情</text>
           </view>
         </view>
       </view>
     </scroll-view>
 
     <!-- 底部导航栏 -->
-    <view class="bottom-bar">
+    <view class="bottom-bar" :style="cardStyle">
       <view class="nav-buttons">
         <view class="nav-btn study" 
               :class="{ 'study-btn-disabled': currentQuestion.is_learned }"
               @click="toggleStudyStatus">
-          <text class="btn-text">{{ currentQuestion.is_learned ? '已学习' : '记住了' }}</text>
+          <text class="btn-text" :style="{ color: currentQuestion.is_learned ? theme.secondaryTextColor : theme.primaryColor }">{{ currentQuestion.is_learned ? '已学习' : '记住了' }}</text>
         </view>
         <view class="nav-btn prev" @click="prevQuestion" :class="{ disabled: currentIndex === 0 }">
-          <text class="btn-text">上一题</text>
+          <text class="btn-text" :style="{ color: currentIndex === 0 ? theme.secondaryTextColor : theme.textColor }">上一题</text>
         </view>
         <view class="nav-btn next" @click="nextQuestion" :class="{ disabled: currentIndex === totalQuestions - 1 }">
-          <text class="btn-text">下一题</text>
+          <text class="btn-text" :style="{ color: currentIndex === totalQuestions - 1 ? theme.secondaryTextColor : theme.textColor }">下一题</text>
         </view>
       </view>
     </view>
 
     <!-- 加载状态 -->
     <view v-if="isLoading" class="loading">
-      <text>加载中...</text>
+      <text :style="{ color: theme.secondaryTextColor }">加载中...</text>
     </view>
   </view>
 </template>
@@ -93,6 +93,7 @@ import db from '@/common/database'
 import { checkAndInitDB } from '@/common/dbInit'
 import { formatDateTime } from '@/utils/dateUtil'
 import audioPlayer from '@/utils/audioPlayer'
+import useTheme from '@/mixins/themeMixin'
 import { 
     getQuestionById, 
     updateLearnStatus, 
@@ -100,6 +101,8 @@ import {
     toggleFavorite,
     getQuestionsWithStatus
 } from '@/api/api'
+
+const { theme, themeStyle, cardStyle } = useTheme()
 
 const categoryId = ref('')
 const categoryName = ref('')
@@ -505,15 +508,15 @@ watch(() => currentQuestion.value?.id, (newId, oldId) => {
 <style>
 .container {
     min-height: 100vh;
-    background-color: #f5f6fa;
     padding-top: var(--status-bar-height);
+    transition: background-color 0.3s ease;
 }
 
 .nav-bar {
-    background-color: #fff;
     padding: 20rpx 30rpx;
     display: flex;
     align-items: center;
+    border-bottom: 1rpx solid;
     border-bottom: 1rpx solid #eee;
     position: sticky;
     top: var(--status-bar-height);
@@ -730,14 +733,13 @@ watch(() => currentQuestion.value?.id, (newId, oldId) => {
 
 .answer-content {
   padding: 30rpx;
-  background-color: #fff;
+  background-color: transparent;
   width: 100%;
   box-sizing: border-box;
 }
 
 .answer-text {
   font-size: 28rpx;
-  color: #333;
   line-height: 1.8;
   width: 100%;
   word-break: break-all;
@@ -792,11 +794,12 @@ watch(() => currentQuestion.value?.id, (newId, oldId) => {
 }
 
 .bottom-bar {
-  background-color: #f8f8f8;
+  background-color: transparent;
   padding: 12rpx 24rpx;
   display: flex;
   align-items: center;
-  border-top: 1rpx solid #e0e0e0;
+  border-top: 1rpx solid;
+  border-color: var(--border-color);
   position: fixed;
   bottom: 0;
   left: 0;
@@ -820,33 +823,34 @@ watch(() => currentQuestion.value?.id, (newId, oldId) => {
   justify-content: center;
   height: 76rpx;
   border-radius: 8rpx;
-  background-color: #fff;
-  border: 1rpx solid #ddd;
+  background-color: transparent;
+  border: 1rpx solid;
+  border-color: var(--border-color);
   transition: all 0.2s;
   min-width: 0;
 }
 
 .nav-btn.study {
-  border-color: #007AFF;
+  border-color: var(--primary-color);
 }
 
 .nav-btn .btn-text {
   font-size: 32rpx;
-  color: #666;
   font-weight: 400;
+  transition: color 0.3s ease;
 }
 
 .nav-btn.study .btn-text {
-  color: #007AFF;
   font-weight: 400;
+  transition: color 0.3s ease;
 }
 
 .nav-btn:active {
-  background-color: #f5f5f5;
+  opacity: 0.8;
 }
 
 .nav-btn.study:active {
-  background-color: rgba(0, 122, 255, 0.1);
+  opacity: 0.8;
 }
 
 .nav-btn.disabled {
@@ -855,13 +859,13 @@ watch(() => currentQuestion.value?.id, (newId, oldId) => {
 }
 
 .nav-btn.study.study-btn-disabled {
-  background-color: #f5f5f5;
-  border-color: #ddd;
+  background-color: transparent;
+  border-color: var(--border-color);
   opacity: 1;
 }
 
 .nav-btn.study.study-btn-disabled .btn-text {
-  color: #999;
+  color: var(--secondary-text-color);
 }
 
 /* 修改详情链接样式 */
